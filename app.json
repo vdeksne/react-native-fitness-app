@@ -15,6 +15,24 @@
       ]
     ],
     "name": "fit-app",
-    "slug": "fit-app"
+    "slug": "fit-app",
+    "extra": {
+      "googleClientIdAndroid": "474025756678-d2hjb131gbveacva7qf78t3qks8glvtb.apps.googleusercontent.com",
+      "googleClientIdIos": "474025756678-49v70mbbo2i89jd2h2k1oalg0lbbb2md.apps.googleusercontent.com",
+      "googleClientIdWeb": "474025756678-jnitvr40kjougqqfoaqgv1c8e41si6pf.apps.googleusercontent.com",
+      "clerkPublishableKey": "pk_test_cGxlYXNlZC1lZnQtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA",
+      "router": {
+        "origin": "https://localhost"
+      },
+      "eas": {
+        "projectId": "074f3e88-bac8-4352-aace-acabb8a9b7f4"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.vdeksne.fitnessapp"
+    },
+    "android": {
+      "package": "com.vdeksne.fitnessapp"
+    }
   }
 }

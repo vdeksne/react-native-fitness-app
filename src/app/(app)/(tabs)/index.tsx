@@ -1,7 +1,16 @@
 import React from "react";
-import { SafeAreaView, Text, View, StyleSheet } from "react-native";
+import {
+  SafeAreaView,
+  Text,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
+import { useRouter } from "expo-router";
 
 export default function Page() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -9,6 +18,12 @@ export default function Page() {
       </View>
       <View style={styles.content}>
         <Text style={styles.greeting}>Welcome to Workout App!</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push("/sign-in")}
+        >
+          <Text style={styles.buttonText}>Sign In</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -45,6 +60,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     marginTop: 20,
+    marginBottom: 30,
+  },
+  button: {
+    backgroundColor: "#000",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   authContainer: {
     flex: 1,
