@@ -1,0 +1,238 @@
+import { useSignIn, useOAuth } from "@clerk/clerk-expo";
+import { Link, useRouter } from "expo-router";
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  SafeAreaView,
+  Alert,
+} from "react-native";
+import React from "react";
+import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+
+// Complete the OAuth flow in the browser
+WebBrowser.maybeCompleteAuthSession();
+
+export default function SignInScreen() {
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const router = useRouter();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+
+  // Handle Google OAuth sign-in
+  const onGoogleSignIn = React.useCallback(async () => {
+    if (!isLoaded || !startOAuthFlow) return;
+
+    try {
+      setLoading(true);
+      const { createdSessionId, setActive: setActiveSession } =
+        await startOAuthFlow();
+
+      if (createdSessionId && setActiveSession) {
+        await setActiveSession({ session: createdSessionId });
+        router.replace("/");
+      }
+    } catch (err: any) {
+      setLoading(false);
+      // User canceled or error occurred
+      if (err.errors?.[0]?.code !== "user_cancelled") {
+        Alert.alert(
+          "Error",
+          err.errors?.[0]?.message || "Failed to sign in with Google"
+        );
+      }
+      console.error("Google sign-in error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, startOAuthFlow, router]);
+
+  // Handle email/password sign-in
+  const onSignInPress = async () => {
+    if (!isLoaded) return;
+
+    try {
+      setLoading(true);
+      const signInAttempt = await signIn.create({
+        identifier: emailAddress,
+        password,
+      });
+
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/");
+      } else {
+        Alert.alert(
+          "Error",
+          "Sign-in incomplete. Please check your email for verification."
+        );
+        console.error(JSON.stringify(signInAttempt, null, 2));
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err.errors?.[0]?.message || "Failed to sign in");
+      console.error(JSON.stringify(err, null, 2));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Sign In</Text>
+
+        {/* Google Sign In Button */}
+        <TouchableOpacity
+          style={[styles.googleButton, loading && styles.buttonDisabled]}
+          onPress={onGoogleSignIn}
+          disabled={loading || !isLoaded}
+        >
+          <Ionicons name="logo-google" size={20} color="#fff" />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Email Input */}
+        <TextInput
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={emailAddress}
+          placeholder="Email address"
+          placeholderTextColor="#999"
+          onChangeText={setEmailAddress}
+          editable={!loading}
+        />
+
+        {/* Password Input */}
+        <TextInput
+          style={styles.input}
+          value={password}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          secureTextEntry={true}
+          onChangeText={setPassword}
+          editable={!loading}
+        />
+
+        {/* Sign In Button */}
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={onSignInPress}
+          disabled={loading || !isLoaded}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Sign Up Link */}
+        <View style={styles.linkContainer}>
+          <Text style={styles.linkText}>Don't have an account? </Text>
+          <Link href="/sign-up" asChild>
+            <TouchableOpacity>
+              <Text style={styles.link}>Sign up</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    marginBottom: 32,
+    textAlign: "center",
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4285F4",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+    gap: 8,
+  },
+  googleButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: "#999",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: "#F9F9F9",
+  },
+  button: {
+    backgroundColor: "#000",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 24,
+  },
+  linkText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  link: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});
