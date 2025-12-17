@@ -17,10 +17,13 @@
     "name": "fit-app",
     "slug": "fit-app",
     "extra": {
-      "googleClientIdAndroid": "474025756678-d2hjb131gbveacva7qf78t3qks8glvtb.apps.googleusercontent.com",
       "googleClientIdIos": "474025756678-49v70mbbo2i89jd2h2k1oalg0lbbb2md.apps.googleusercontent.com",
-      "googleClientIdWeb": "474025756678-jnitvr40kjougqqfoaqgv1c8e41si6pf.apps.googleusercontent.com",
+      "googleClientIdWeb": "474025756678-mko85kv1nql2dvnrngh1oa1ccgob5eib.apps.googleusercontent.com",
       "clerkPublishableKey": "pk_test_cGxlYXNlZC1lZnQtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA",
+      "apiNinjasKey": "O2CRYreaUPc0k2GFLSxsTw==JbLWZRs2iBUdf2Ye",
+      "exerciseDbApiKey": "377fe45b55mshcd5569a6578782dp1c774ejsn13d4cf1bb56e",
+      "exerciseDbHost": "exercisedb-api1.p.rapidapi.com",
+      "exerciseDbBaseUrl": "https://exercisedb-api1.p.rapidapi.com/api/v1",
       "router": {
         "origin": "https://localhost"
       },

@@ -1,0 +1,9 @@
+{
+  "schemaPath": "./sanity/schema.json",
+  "outputPath": "./lib/sanity/types.ts",
+  "studioPath": "./sanity",
+  "enableSourceMaps": false,
+  "reactQuery": {
+    "enabled": false
+  }
+}

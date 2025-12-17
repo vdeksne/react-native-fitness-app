@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
+import { makeRedirectUri } from "expo-auth-session";
 import Constants from "expo-constants";
 import { useAuthContext } from "../../context/AuthContext";
 
@@ -22,11 +23,14 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const { setEmail: setAuthEmail } = useAuthContext();
 
+  const redirectUri = makeRedirectUri({ useProxy: true } as any);
+
   // Google OAuth (expo-auth-session)
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: Constants.expoConfig?.extra?.googleClientIdIos ?? "",
     androidClientId: Constants.expoConfig?.extra?.googleClientIdAndroid ?? "",
     webClientId: Constants.expoConfig?.extra?.googleClientIdWeb ?? "",
+    redirectUri,
   });
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export default function SignInScreen() {
 
   const handleGoogleSignIn = async () => {
     try {
-      await promptAsync();
+      await promptAsync({ useProxy: true, redirectUri } as any);
     } catch (err: any) {
       Alert.alert("Google Sign-in failed", err?.message || "Please try again");
       console.error("Google sign-in error:", err);

@@ -4,126 +4,193 @@ import {
   Text,
   View,
   StyleSheet,
-  TouchableOpacity,
+  Image,
+  ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+
+const lastWorkouts = [
+  { title: "Today", duration: "90 min", summary: "4 exercises | 20 sets" },
+  { title: "Yesterday", duration: "75 min", summary: "5 exercises | 18 sets" },
+];
 
 export default function Page() {
-  const router = useRouter();
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Home</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.greeting}>Welcome to Workout App!</Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/sign-in")}
-        >
-          <Text style={styles.buttonText}>Sign In</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
-}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <View style={styles.avatar}>
+            <Image
+              source={{
+                uri: "https://media.licdn.com/dms/image/v2/D4E03AQHcrn61J7Kujg/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1690920703856?e=1767830400&v=beta&t=6ybsVAxwOmhRFTV8w-KMmEAwcPAmdFc-9s0se84G3SU",
+              }}
+              style={styles.avatarImage}
+            />
+          </View>
+          <View>
+            <Text style={styles.greeting}>Hello Viktorija!</Text>
+            <Text style={styles.date}>Thursday, January 1</Text>
+          </View>
+        </View>
 
-function Header() {
-  return (
-    <View style={styles.header}>
-      <Text style={styles.headerTitle}>Home</Text>
-    </View>
+        {/* Workout Statistics */}
+        <Text style={styles.sectionTitle}>Workout Statistics</Text>
+        <View style={styles.statsGrid}>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Total Workouts</Text>
+            <Text style={styles.cardValue}>1000</Text>
+          </View>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Average Duration</Text>
+            <Text style={styles.cardValue}>90 min</Text>
+            <View style={styles.placeholderChart} />
+          </View>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Total Time</Text>
+            <Text style={styles.cardValue}>10,000 h</Text>
+          </View>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Weekly Volume</Text>
+            <Text style={styles.cardValue}>120 sets</Text>
+            <Text style={styles.cardSubValue}>8,390 kg lifted</Text>
+          </View>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Active Streak</Text>
+            <Text style={styles.cardValue}>12 days</Text>
+          </View>
+          <View style={[styles.card, styles.cardSmall]}>
+            <Text style={styles.cardLabel}>Best Streak</Text>
+            <Text style={styles.cardValue}>30 days</Text>
+          </View>
+        </View>
+
+        {/* Last Workouts */}
+        <Text style={styles.sectionTitle}>Last Workouts</Text>
+        <View style={styles.list}>
+          {lastWorkouts.map((item, idx) => (
+            <View key={`${item.title}-${idx}`} style={styles.listItem}>
+              <Text style={styles.listTitle}>{item.title}</Text>
+              <Text style={styles.listDuration}>{item.duration}</Text>
+              <Text style={styles.listSummary}>{item.summary}</Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#F7F7F7",
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  content: {
+  scroll: {
     flex: 1,
-    padding: 20,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#EFEFEF",
+    marginRight: 12,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
   greeting: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  button: {
-    backgroundColor: "#000",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  authContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  authContent: {
-    width: "100%",
-    maxWidth: 400,
-    alignItems: "center",
-  },
-  welcomeTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  welcomeSubtitle: {
     fontSize: 16,
     color: "#666",
-    textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 2,
   },
-  primaryButton: {
-    backgroundColor: "#000",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 16,
+  date: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
   },
-  primaryButtonText: {
-    color: "#fff",
+  sectionTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#111",
   },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: "#000",
+    borderColor: "#EAEAEA",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
   },
-  secondaryButtonText: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: "600",
+  cardSmall: {
+    width: "48%",
+    minHeight: 110,
+    justifyContent: "space-between",
+  },
+  cardLabel: {
+    fontSize: 13,
+    color: "#777",
+    marginBottom: 8,
+  },
+  cardValue: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#111",
+  },
+  cardSubValue: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#777",
+  },
+  placeholderChart: {
+    marginTop: 8,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#FDE7EB",
+  },
+  list: {
+    gap: 12,
+  },
+  listItem: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+  },
+  listTitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 6,
+  },
+  listDuration: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
+  },
+  listSummary: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#777",
   },
 });
