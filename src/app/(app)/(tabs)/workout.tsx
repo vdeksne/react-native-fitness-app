@@ -1,4 +1,10 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import {
   SafeAreaView,
   View,
@@ -6,10 +12,34 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { client, adminClient } from "../../../../sanity/client";
 
 type Unit = "lbs" | "kg";
+
+type ExerciseOption = {
+  _id: string;
+  name: string;
+  majorMuscleGroups?: string[];
+  trainingDays?: string[];
+};
+
+type SetEntry = {
+  reps: string;
+  weight: string;
+  unit: Unit;
+};
+
+type ActiveExercise = {
+  key: string;
+  exerciseId: string;
+  name: string;
+  sets: SetEntry[];
+};
 
 const trainingDayOptions = [
   { value: "legsGlutesDay", label: "Legs & Glutes Day" },
@@ -21,12 +51,24 @@ const trainingDayOptions = [
 ];
 
 export default function Workout() {
+  const canWrite = adminClient !== client;
   const [started, setStarted] = useState(false);
   const [unit, setUnit] = useState<Unit>("kg");
+  const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(
     trainingDayOptions[0].value
   );
   const [showDayList, setShowDayList] = useState(false);
+  const [showExerciseList, setShowExerciseList] = useState(false);
+  const [availableExercises, setAvailableExercises] = useState<
+    ExerciseOption[]
+  >([]);
+  const [loadingExercises, setLoadingExercises] = useState(false);
+  const [sessionExercises, setSessionExercises] = useState<ActiveExercise[]>(
+    []
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // --- FIX for workoutTimer undefined ---
   const [workoutTimer, setWorkoutTimer] = useState(0);
@@ -50,6 +92,148 @@ export default function Workout() {
     () => trainingDayOptions.find((o) => o.value === selectedDay)?.label,
     [selectedDay]
   );
+
+  const fetchLocalExercises = useCallback(async () => {
+    try {
+      setLoadingExercises(true);
+      setError(null);
+      const data = await client.fetch(
+        `*[_type == "exercise" && isActive != false]{_id, name, majorMuscleGroups, trainingDays}`
+      );
+      const arr: ExerciseOption[] = Array.isArray(data) ? data : [];
+      setAvailableExercises(arr);
+    } catch (e: any) {
+      setError("Could not load exercises from your database.");
+    } finally {
+      setLoadingExercises(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLocalExercises();
+  }, [fetchLocalExercises]);
+
+  const addExerciseToSession = (exerciseId: string) => {
+    const found = availableExercises.find((ex) => ex._id === exerciseId);
+    if (!found) return;
+    const key = `${exerciseId}-${Date.now()}`;
+    setSessionExercises((prev) => [
+      ...prev,
+      {
+        key,
+        exerciseId,
+        name: found.name,
+        sets: [{ reps: "0", weight: "0", unit }],
+      },
+    ]);
+    setShowExerciseList(false);
+  };
+
+  const updateSet = (
+    exerciseKey: string,
+    setIndex: number,
+    field: "reps" | "weight" | "unit",
+    value: string
+  ) => {
+    setSessionExercises((prev) =>
+      prev.map((ex) =>
+        ex.key === exerciseKey
+          ? {
+              ...ex,
+              sets: ex.sets.map((s, i) =>
+                i === setIndex ? { ...s, [field]: value } : s
+              ),
+            }
+          : ex
+      )
+    );
+  };
+
+  const addSet = (exerciseKey: string) => {
+    setSessionExercises((prev) =>
+      prev.map((ex) =>
+        ex.key === exerciseKey
+          ? {
+              ...ex,
+              sets: [...ex.sets, { reps: "0", weight: "0", unit }],
+            }
+          : ex
+      )
+    );
+  };
+
+  const removeSet = (exerciseKey: string, setIndex: number) => {
+    setSessionExercises((prev) =>
+      prev.map((ex) =>
+        ex.key === exerciseKey
+          ? { ...ex, sets: ex.sets.filter((_, i) => i !== setIndex) }
+          : ex
+      )
+    );
+  };
+
+  const removeExercise = (exerciseKey: string) => {
+    setSessionExercises((prev) => prev.filter((ex) => ex.key !== exerciseKey));
+  };
+
+  const handleStart = () => {
+    setStarted(true);
+    setStartedAt(new Date());
+  };
+
+  const handleEnd = () => {
+    setStarted(false);
+    setSessionExercises([]);
+    setStartedAt(null);
+  };
+
+  const handleComplete = async () => {
+    if (!canWrite) {
+      Alert.alert(
+        "Sanity write token required",
+        "Set EXPO_PUBLIC_SANITY_TOKEN (write-enabled) and restart the dev server."
+      );
+      return;
+    }
+    if (sessionExercises.length === 0) {
+      Alert.alert("Add exercises", "Please add at least one exercise.");
+      return;
+    }
+    const clientToUse = adminClient || client;
+    const now = new Date();
+    const durationMin =
+      startedAt != null
+        ? Math.max(1, Math.round((now.getTime() - startedAt.getTime()) / 60000))
+        : Math.max(1, Math.round(workoutTimer / 60));
+
+    const payload = {
+      _type: "workout",
+      userId: "demo-user",
+      date: now.toISOString(),
+      startedAt: startedAt ? startedAt.toISOString() : now.toISOString(),
+      endedAt: now.toISOString(),
+      durationMin,
+      exercises: sessionExercises.map((ex) => ({
+        exercise: { _type: "reference", _ref: ex.exerciseId },
+        sets: ex.sets.map((s) => ({
+          reps: Number(s.reps) || 0,
+          weight: s.weight ? Number(s.weight) : undefined,
+          weightUnit: s.unit,
+        })),
+      })),
+    };
+
+    try {
+      setSaving(true);
+      await clientToUse.create(payload);
+      Alert.alert("Saved", "Workout saved to your history.");
+      handleEnd();
+    } catch (e: any) {
+      Alert.alert("Save failed", "Could not save workout to your database.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!started) {
     return (
@@ -100,10 +284,7 @@ export default function Workout() {
             )}
           </View>
 
-          <TouchableOpacity
-            style={styles.successBtn}
-            onPress={() => setStarted(true)}
-          >
+          <TouchableOpacity style={styles.successBtn} onPress={handleStart}>
             <Text style={styles.successBtnText}>Start Workout</Text>
           </TouchableOpacity>
         </View>
@@ -155,10 +336,7 @@ export default function Workout() {
               </Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.endBtn}
-            onPress={() => setStarted(false)}
-          >
+          <TouchableOpacity style={styles.endBtn} onPress={handleEnd}>
             <Text style={styles.endBtnText}>End Workout</Text>
           </TouchableOpacity>
         </View>
@@ -169,30 +347,128 @@ export default function Workout() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.caption}>1 exercises</Text>
+        <Text style={styles.caption}>
+          {sessionExercises.length}{" "}
+          {sessionExercises.length === 1 ? "exercise" : "exercises"}
+        </Text>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.cardTitle}>Hamstring Curl</Text>
-              <Text style={styles.cardMeta}>0 sets · 0 completed</Text>
+        {sessionExercises.map((ex) => (
+          <View style={styles.card} key={ex.key}>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={styles.cardTitle}>{ex.name}</Text>
+                <Text style={styles.cardMeta}>
+                  {ex.sets.length} sets · {ex.sets.length} completed
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => removeExercise(ex.key)}
+              >
+                <Ionicons name="trash" size={18} color="#C83737" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="trash" size={18} color="#C83737" />
+
+            <Text style={styles.sectionLabel}>Sets</Text>
+            {ex.sets.length === 0 ? (
+              <TouchableOpacity style={styles.emptySet}>
+                <Text style={styles.emptySetText}>
+                  No sets yet. Add your first set below.
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {ex.sets.map((set, idx) => (
+              <View key={`${ex.key}-set-${idx}`} style={styles.setRow}>
+                <Text style={styles.setIndex}>{idx + 1}</Text>
+                <View style={styles.setInputs}>
+                  <View style={styles.setInputBlock}>
+                    <Text style={styles.setLabel}>Reps</Text>
+                    <TextInput
+                      style={styles.setInput}
+                      keyboardType="numeric"
+                      value={set.reps}
+                      onChangeText={(t) => updateSet(ex.key, idx, "reps", t)}
+                    />
+                  </View>
+                  <View style={styles.setInputBlock}>
+                    <Text style={styles.setLabel}>Weight ({set.unit})</Text>
+                    <TextInput
+                      style={styles.setInput}
+                      keyboardType="numeric"
+                      value={set.weight}
+                      onChangeText={(t) => updateSet(ex.key, idx, "weight", t)}
+                    />
+                  </View>
+                </View>
+                <View style={styles.setActions}>
+                  <TouchableOpacity
+                    style={styles.unitToggleSmall}
+                    onPress={() =>
+                      updateSet(
+                        ex.key,
+                        idx,
+                        "unit",
+                        set.unit === "kg" ? "lbs" : "kg"
+                      )
+                    }
+                  >
+                    <Text style={styles.unitToggleSmallText}>
+                      {set.unit.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconBtnSmall}
+                    onPress={() => removeSet(ex.key, idx)}
+                  >
+                    <Ionicons name="trash" size={16} color="#C83737" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addSetBtn}
+              onPress={() => addSet(ex.key)}
+            >
+              <Text style={styles.addSetText}>+ Add Set</Text>
             </TouchableOpacity>
           </View>
+        ))}
 
-          <Text style={styles.sectionLabel}>Sets</Text>
-          <TouchableOpacity style={styles.emptySet}>
-            <Text style={styles.emptySetText}>
-              No sets yet. Add your first set below.
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.addSetBtn}>
-            <Text style={styles.addSetText}>+ Add Set</Text>
-          </TouchableOpacity>
-        </View>
+        {showExerciseList && (
+          <View style={styles.exerciseList}>
+            <View style={styles.exerciseListHeader}>
+              <Text style={styles.exerciseListTitle}>Choose exercise</Text>
+              <TouchableOpacity onPress={() => setShowExerciseList(false)}>
+                <Ionicons name="close" size={20} color="#111" />
+              </TouchableOpacity>
+            </View>
+            {loadingExercises ? (
+              <View style={styles.loaderRow}>
+                <ActivityIndicator color="#1E3DF0" />
+                <Text style={styles.loaderText}>Loading...</Text>
+              </View>
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 260 }}>
+                {availableExercises.map((opt) => (
+                  <TouchableOpacity
+                    key={opt._id}
+                    style={styles.exerciseListItem}
+                    onPress={() => addExerciseToSession(opt._id)}
+                  >
+                    <Text style={styles.exerciseListName}>{opt.name}</Text>
+                    <Text style={styles.exerciseListMeta}>
+                      {opt.majorMuscleGroups?.join(", ") || "Muscle group"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         <View style={styles.dayPicker}>
           <TouchableOpacity
@@ -234,12 +510,21 @@ export default function Workout() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={() => setShowExerciseList(true)}
+        >
           <Text style={styles.primaryBtnText}>+ Add Exercise</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.successBtn}>
-          <Text style={styles.successBtnText}>Complete Workout</Text>
+        <TouchableOpacity
+          style={[styles.successBtn, saving && { opacity: 0.7 }]}
+          onPress={handleComplete}
+          disabled={saving}
+        >
+          <Text style={styles.successBtnText}>
+            {saving ? "Saving..." : "Complete Workout"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -383,6 +668,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
+  setRow: {
+    borderWidth: 1,
+    borderColor: "#E5E9F2",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "#F7FBFF",
+  },
+  setIndex: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E3DF0",
+    marginBottom: 6,
+  },
+  setInputs: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 8,
+  },
+  setInputBlock: {
+    flex: 1,
+  },
+  setLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  setInput: {
+    borderWidth: 1,
+    borderColor: "#D9DFEA",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+  },
+  setActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  unitToggleSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "#1E3DF0",
+  },
+  unitToggleSmallText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  iconBtnSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FDEAEA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dayPicker: {
     marginBottom: 16,
   },
@@ -450,6 +794,54 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  exerciseList: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    padding: 12,
+    marginBottom: 16,
+  },
+  exerciseListHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  exerciseListTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+  },
+  exerciseListItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F2F6",
+  },
+  exerciseListName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111",
+  },
+  exerciseListMeta: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  loaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  loaderText: {
+    color: "#111",
+    fontSize: 13,
+  },
+  errorText: {
+    color: "#C83737",
+    fontSize: 13,
   },
   starter: {
     flex: 1,

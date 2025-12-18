@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -9,12 +9,154 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { client } from "../../../../sanity/client";
 
 const dayLabels = ["5", "6", "7", "Now, July 8", "9", "10", "11"];
 
 export default function Profile() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [workouts, setWorkouts] = useState<
+    {
+      _id: string;
+      date?: string;
+      durationMin?: number;
+      exercises?: {
+        name?: string;
+        sets?: { reps?: number; weight?: number; weightUnit?: string }[];
+      }[];
+    }[]
+  >([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await client.fetch(
+          `*[_type == "workout"] | order(date desc) [0..2]{
+            _id,
+            date,
+            durationMin,
+            exercises[]{
+              "name": exercise->name,
+              sets[]{reps, weight, weightUnit}
+            }
+          }`
+        );
+        const arr = Array.isArray(data) ? data : [];
+        setWorkouts(arr);
+      } catch (e: any) {
+        setError("Could not load workout stats.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const stats = useMemo(() => {
+    if (!workouts.length) {
+      return { totalWorkouts: 0, totalMinutes: 0, totalVolume: 0 };
+    }
+    const totalWorkouts = workouts.length;
+    const totalMinutes = workouts.reduce(
+      (acc, w) => acc + (w.durationMin || 0),
+      0
+    );
+    const totalVolume = workouts.reduce((acc, w) => {
+      const vol = (w.exercises || []).reduce((exAcc, ex) => {
+        return (
+          exAcc +
+          (ex.sets || []).reduce((sAcc, s) => {
+            const reps = s.reps || 0;
+            const weight = s.weight || 0;
+            return sAcc + reps * weight;
+          }, 0)
+        );
+      }, 0);
+      return acc + vol;
+    }, 0);
+    return { totalWorkouts, totalMinutes, totalVolume };
+  }, [workouts]);
+
+  const cards = useMemo(() => {
+    if (!workouts.length) return [];
+    return workouts.map((w) => {
+      const setCount = (w.exercises || []).reduce(
+        (acc, ex) => acc + (ex.sets?.length || 0),
+        0
+      );
+      const volume = (w.exercises || []).reduce((acc, ex) => {
+        return (
+          acc +
+          (ex.sets || []).reduce((sAcc, s) => {
+            const reps = s.reps || 0;
+            const weight = s.weight || 0;
+            return sAcc + reps * weight;
+          }, 0)
+        );
+      }, 0);
+
+      const title = w.exercises?.[0]?.name || "Workout";
+      const dateLabel = w.date
+        ? new Date(w.date).toLocaleDateString()
+        : "Recent";
+
+      return {
+        key: w._id,
+        title,
+        dateLabel,
+        duration: w.durationMin ? `${w.durationMin} min` : "—",
+        volume: `${volume} kg`,
+        sets: `${setCount} sets`,
+      };
+    });
+  }, [workouts]);
+
+  const formattedTime = useMemo(() => {
+    const hours = Math.floor(stats.totalMinutes / 60);
+    const minutes = stats.totalMinutes % 60;
+    if (hours === 0) return `${minutes}m`;
+    return `${hours}h ${minutes}m`;
+  }, [stats]);
+
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
     <SafeAreaView style={styles.container}>
+      {showSettings ? (
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.settingsOverlay}
+          onPress={() => setShowSettings(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.settingsSheet}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.settingsGrabber} />
+            <Text style={styles.settingsTitle}>Settings</Text>
+            <TouchableOpacity
+              style={styles.settingsAction}
+              onPress={() => {
+                // TODO: wire real logout handler
+              }}
+            >
+              <Ionicons name="log-out-outline" size={18} color="#C83737" />
+              <Text style={styles.settingsActionText}>Log out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsCancel}
+              onPress={() => setShowSettings(false)}
+            >
+              <Text style={styles.settingsCancelText}>Close</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      ) : null}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
@@ -26,7 +168,10 @@ export default function Profile() {
             <Ionicons name="close" size={18} color="#111" />
           </TouchableOpacity>
           <Text style={styles.topTitle}>Your Profile</Text>
-          <TouchableOpacity style={styles.iconCircle}>
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={() => setShowSettings(true)}
+          >
             <Ionicons name="settings-outline" size={18} color="#111" />
           </TouchableOpacity>
         </View>
@@ -46,63 +191,50 @@ export default function Profile() {
         <View style={styles.metricsRow}>
           <View style={styles.metric}>
             <Ionicons name="flash-outline" size={22} color="#111" />
-            <Text style={styles.metricValue}>246</Text>
-            <Text style={styles.metricLabel}>Total workouts</Text>
+            <Text style={styles.metricValue}>
+              {loading ? "…" : stats.totalWorkouts}
+            </Text>
+            <Text style={styles.metricLabel}>
+              {error ? "Error" : "Total workouts"}
+            </Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="person-outline" size={22} color="#111" />
-            <Text style={styles.metricValue}>682h</Text>
+            <Text style={styles.metricValue}>
+              {loading ? "…" : formattedTime}
+            </Text>
             <Text style={styles.metricLabel}>Total Time</Text>
+          </View>
+          <View style={styles.metric}>
+            <Ionicons name="fitness-outline" size={22} color="#111" />
+            <Text style={styles.metricValue}>
+              {loading ? "…" : `${stats.totalVolume} kg`}
+            </Text>
+            <Text style={styles.metricLabel}>Total Volume</Text>
           </View>
         </View>
 
-        {/* Tabs */}
-        <View style={styles.tabs}>
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>Timeline</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, styles.tabActive]}>
-            <Text style={[styles.tabText, styles.tabTextActive]}>Stats</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, styles.tabMuted]}>
-            <Text style={styles.tabText}>Duels</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Day strip */}
-        <View style={styles.dayStrip}>
-          {dayLabels.map((d, idx) => {
-            const isNow = d.startsWith("Now");
-            return (
-              <TouchableOpacity
-                key={d}
-                style={[styles.dayItem, isNow && styles.dayItemActive]}
-              >
-                <Text style={[styles.dayText, isNow && styles.dayTextActive]}>
-                  {isNow ? d : d}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Activity cards */}
-        <ActivityCard
-          color="#FDE9EA"
-          icon="run"
-          title="Indoor Run"
-          distance="5.56 km"
-          duration="24 min"
-          calories="348 kcal"
-        />
-        <ActivityCard
-          color="#E7E7E7"
-          icon="bike"
-          title="Outdoor Cycle"
-          distance="4.22 km"
-          duration="24 min"
-          calories="248 kcal"
-        />
+        {/* Latest workouts */}
+        {loading ? (
+          <Text style={styles.loadingText}>Loading workouts…</Text>
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : cards.length === 0 ? (
+          <Text style={styles.emptyText}>No workouts yet.</Text>
+        ) : (
+          cards.map((c, idx) => (
+            <ActivityCard
+              key={c.key}
+              color={idx === 0 ? "#FDE9EA" : "#E7E7E7"}
+              icon="run"
+              title={c.title}
+              subtitle={c.dateLabel}
+              duration={c.duration}
+              volume={c.volume}
+              sets={c.sets}
+            />
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -112,41 +244,34 @@ function ActivityCard({
   color,
   icon,
   title,
-  distance,
+  subtitle,
   duration,
-  calories,
+  volume,
+  sets,
 }: {
   color: string;
   icon: "run" | "bike";
   title: string;
-  distance: string;
+  subtitle: string;
   duration: string;
-  calories: string;
+  volume: string;
+  sets: string;
 }) {
-  const iconName =
-    icon === "run"
-      ? "run"
-      : "bike-fast";
+  const iconName = icon === "run" ? "run" : "bike-fast";
 
   return (
     <View style={styles.card}>
       <View style={[styles.cardIcon, { backgroundColor: color }]}>
-        <MaterialCommunityIcons
-          name={iconName as any}
-          size={22}
-          color="#111"
-        />
+        <MaterialCommunityIcons name={iconName as any} size={22} color="#111" />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardMeta}>{subtitle}</Text>
         <Text style={styles.cardMeta}>{duration}</Text>
       </View>
       <View style={styles.cardRight}>
-        <Text style={styles.cardPrimary}>{distance}</Text>
-        <View style={styles.cardCaloriesRow}>
-          <Ionicons name="flame-outline" size={14} color="#777" />
-          <Text style={styles.cardCalories}>{calories}</Text>
-        </View>
+        <Text style={styles.cardPrimary}>{volume}</Text>
+        <Text style={styles.cardCalories}>{sets}</Text>
       </View>
     </View>
   );
@@ -237,6 +362,83 @@ const styles = StyleSheet.create({
   },
   tabMuted: {
     backgroundColor: "#F7F7F7",
+  },
+  loadingText: {
+    textAlign: "center",
+    color: "#666",
+    marginVertical: 8,
+  },
+  errorText: {
+    textAlign: "center",
+    color: "#C83737",
+    marginVertical: 8,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#666",
+    marginVertical: 8,
+  },
+  settingsOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "flex-end",
+    zIndex: 10,
+  },
+  settingsSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 22,
+    borderTopWidth: 1,
+    borderColor: "#E5E5E5",
+  },
+  settingsGrabber: {
+    width: 48,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#D7D7D7",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  settingsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  settingsAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    backgroundColor: "#FFF4F4",
+  },
+  settingsActionText: {
+    color: "#C83737",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  settingsCancel: {
+    marginTop: 14,
+    alignSelf: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F4F4F4",
+    borderRadius: 12,
+  },
+  settingsCancelText: {
+    color: "#111",
+    fontWeight: "700",
+    fontSize: 14,
   },
   dayStrip: {
     flexDirection: "row",

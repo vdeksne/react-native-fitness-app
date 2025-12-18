@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -6,10 +6,90 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { client } from "../../../../sanity/client";
+
+type WorkoutSet = { reps?: number; weight?: number; weightUnit?: string };
+type WorkoutExercise = { name: string; sets: WorkoutSet[] };
+type WorkoutDoc = {
+  _id: string;
+  date?: string;
+  durationMin?: number;
+  exercises: WorkoutExercise[];
+};
 
 export default function History() {
+  const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await client.fetch(
+          `*[_type == "workout"] | order(date desc) [0..9]{
+            _id,
+            date,
+            durationMin,
+            exercises[]{
+              "name": exercise->name,
+              sets[]{reps, weight, weightUnit}
+            }
+          }`
+        );
+        const arr: WorkoutDoc[] = Array.isArray(data) ? data : [];
+        setWorkouts(arr);
+      } catch (e: any) {
+        setError("Could not load workout history.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const latest = workouts[0];
+
+  const summary = useMemo(() => {
+    if (!latest) {
+      return {
+        date: "No workouts yet",
+        duration: "--",
+        exerciseCount: 0,
+        setCount: 0,
+        volume: "--",
+      };
+    }
+    const setCount = latest.exercises.reduce(
+      (acc, ex) => acc + (ex.sets?.length || 0),
+      0
+    );
+    const volumeKg = latest.exercises.reduce((acc, ex) => {
+      return (
+        acc +
+        ex.sets.reduce((sacc, set) => {
+          const reps = set.reps || 0;
+          const weight = set.weight || 0;
+          return sacc + reps * weight;
+        }, 0)
+      );
+    }, 0);
+
+    return {
+      date: latest.date
+        ? new Date(latest.date).toLocaleString()
+        : "Unknown date",
+      duration: latest.durationMin ? `${latest.durationMin} min` : "--",
+      exerciseCount: latest.exercises.length,
+      setCount,
+      volume: `${volumeKg} kg`,
+    };
+  }, [latest]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -26,52 +106,66 @@ export default function History() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Workout Summary</Text>
+          <Text style={styles.summaryTitle}>Latest Workout</Text>
 
-          <View style={styles.summaryRow}>
-            <Ionicons name="calendar-outline" size={16} color="#777" />
-            <Text style={styles.summaryText}>Tuesday, July 1, 2025 at 6:04 PM</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Ionicons name="time-outline" size={16} color="#777" />
-            <Text style={styles.summaryText}>2m 4s</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Ionicons name="barbell-outline" size={16} color="#777" />
-            <Text style={styles.summaryText}>2 exercises</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Ionicons name="stats-chart-outline" size={16} color="#777" />
-            <Text style={styles.summaryText}>3 total sets</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Ionicons name="fitness-outline" size={16} color="#777" />
-            <Text style={styles.summaryText}>14 kg total volume</Text>
-          </View>
-
-          <TouchableOpacity style={styles.deleteBtn}>
-            <Text style={styles.deleteText}>Delete</Text>
-          </TouchableOpacity>
+          {loading ? (
+            <View style={styles.loaderRow}>
+              <ActivityIndicator color="#1E3DF0" />
+              <Text style={styles.loaderText}>Loading...</Text>
+            </View>
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <>
+              <View style={styles.summaryRow}>
+                <Ionicons name="calendar-outline" size={16} color="#777" />
+                <Text style={styles.summaryText}>{summary.date}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Ionicons name="time-outline" size={16} color="#777" />
+                <Text style={styles.summaryText}>{summary.duration}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Ionicons name="barbell-outline" size={16} color="#777" />
+                <Text style={styles.summaryText}>
+                  {summary.exerciseCount} exercises
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Ionicons name="stats-chart-outline" size={16} color="#777" />
+                <Text style={styles.summaryText}>{summary.setCount} total sets</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Ionicons name="fitness-outline" size={16} color="#777" />
+                <Text style={styles.summaryText}>{summary.volume} total volume</Text>
+              </View>
+            </>
+          )}
         </View>
 
-        <ExerciseCard
-          name="Bench Press"
-          setsCompleted={1}
-          sets={[
-            { label: "1 reps", weight: "1 kg" },
-          ]}
-          volume="1 kg"
-        />
-
-        <ExerciseCard
-          name="Lat Pulldown"
-          setsCompleted={2}
-          sets={[
-            { label: "2 reps", weight: "2 kg" },
-            { label: "3 reps", weight: "3 kg" },
-          ]}
-          volume="13 kg"
-        />
+        {loading ? null : workouts.length === 0 ? (
+          <Text style={styles.emptyText}>No workouts saved yet.</Text>
+        ) : (
+          workouts.map((w) => (
+            <View key={w._id} style={{ marginBottom: 16 }}>
+              <Text style={styles.workoutDate}>
+                {w.date ? new Date(w.date).toLocaleString() : "Unknown date"}
+              </Text>
+              {w.exercises.map((ex, idx) => (
+                <ExerciseCard
+                  key={`${w._id}-${idx}`}
+                  name={ex.name}
+                  setsCompleted={ex.sets.length}
+                  sets={ex.sets.map((s) => ({
+                    label: `${s.reps || 0} reps`,
+                    weight: s.weight ? `${s.weight} ${s.weightUnit || "kg"}` : "Bodyweight",
+                  }))}
+                  volume={`${ex.sets.reduce((acc, s) => acc + (s.reps || 0) * (s.weight || 0), 0)} kg`}
+                />
+              ))}
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -172,6 +266,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#555",
   },
+  loaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  loaderText: {
+    color: "#111",
+    fontSize: 13,
+  },
+  errorText: {
+    color: "#C83737",
+    fontSize: 13,
+  },
   deleteBtn: {
     marginTop: 8,
     alignSelf: "flex-end",
@@ -184,6 +292,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: 13,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#666",
+    marginTop: 12,
+  },
+  workoutDate: {
+    fontSize: 13,
+    color: "#555",
+    marginBottom: 8,
+    marginLeft: 4,
   },
   exerciseCard: {
     backgroundColor: "#fff",

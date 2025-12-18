@@ -18,6 +18,19 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: 'startedAt',
+      title: 'Started At',
+      type: 'datetime',
+      description: 'When the workout session was started.',
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: 'endedAt',
+      title: 'Ended At',
+      type: 'datetime',
+      description: 'When the workout session was completed.',
+    }),
+    defineField({
       name: 'durationMin',
       title: 'Duration (minutes)',
       description: 'The total duration of the workout in minutes.',
@@ -44,48 +57,51 @@ export default defineType({
             defineField({
               name: 'sets',
               title: 'Sets',
-              description: 'The number of sets performed for this exercise.',
-              type: 'number',
-              validation: (Rule) => Rule.required().positive().integer(),
-              options: {
-                list: Array.from({length: 10}, (_, i) => i + 1).map((num) => ({
-                  title: `${num} set${num > 1 ? 's' : ''}`,
-                  value: num,
-                })),
-              },
-            }),
-            defineField({
-              name: 'repsPerSet',
-              title: 'Reps per Set',
-              description: 'The number of repetitions performed in each set.',
-              type: 'number',
-              validation: (Rule) => Rule.required().positive().integer(),
-              options: {
-                list: [5, 8, 10, 12, 15, 20].map((num) => ({
-                  title: `${num} reps`,
-                  value: num,
-                })),
-              },
-            }),
-            defineField({
-              name: 'weight',
-              title: 'Weight',
-              type: 'number',
-              description: 'Leave empty if bodyweight.',
-            }),
-            defineField({
-              name: 'weightUnit',
-              title: 'Weight Unit',
-              type: 'string',
-              options: {
-                list: [
-                  {title: 'Kilograms', value: 'kg'},
-                  {title: 'Pounds', value: 'lb'},
-                ],
-                layout: 'radio',
-              },
-              initialValue: 'kg',
-              validation: (Rule) => Rule.required(),
+              description: 'Individual set breakdown for this exercise.',
+              type: 'array',
+              of: [
+                defineField({
+                  name: 'set',
+                  title: 'Set',
+                  type: 'object',
+                  fields: [
+                    defineField({
+                      name: 'reps',
+                      title: 'Reps',
+                      type: 'number',
+                      validation: (Rule) => Rule.required().positive().integer(),
+                    }),
+                    defineField({
+                      name: 'weight',
+                      title: 'Weight',
+                      type: 'number',
+                      description: 'Leave empty if bodyweight.',
+                    }),
+                    defineField({
+                      name: 'weightUnit',
+                      title: 'Weight Unit',
+                      type: 'string',
+                      options: {
+                        list: [
+                          {title: 'Kilograms', value: 'kg'},
+                          {title: 'Pounds', value: 'lb'},
+                        ],
+                        layout: 'radio',
+                      },
+                      initialValue: 'kg',
+                    }),
+                  ],
+                  preview: {
+                    select: {reps: 'reps', weight: 'weight', unit: 'weightUnit'},
+                    prepare({reps, weight, unit}) {
+                      return {
+                        title: reps ? `${reps} reps` : 'Set',
+                        subtitle: weight ? `${weight} ${unit || 'kg'}` : 'Bodyweight',
+                      }
+                    },
+                  },
+                }),
+              ],
             }),
           ],
         }),

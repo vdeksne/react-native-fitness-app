@@ -584,3 +584,11 @@
 {"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1765952410609}
 {"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:start","message":"fetchExercises start","data":{"source":"local","query":"b"},"timestamp":1765952417993}
 {"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1765952418075}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:start","message":"fetchExercises start","data":{"source":"local","query":"Incline"},"timestamp":1766085554029}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1766085554216}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:start","message":"fetchExercises start","data":{"source":"local","query":"Incline"},"timestamp":1766085577584}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1766085577729}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:start","message":"fetchExercises start","data":{"source":"local","query":"Curl"},"timestamp":1766086548622}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1766086548823}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:start","message":"fetchExercises start","data":{"source":"local","query":"Curl"},"timestamp":1766086552617}
+{"sessionId":"debug-session","runId":"pre-fix-1","hypothesisId":"H1","location":"exercises.tsx:fetchExercises:setItemsLocal","message":"Setting items from local","data":{"count":1},"timestamp":1766086552689}
