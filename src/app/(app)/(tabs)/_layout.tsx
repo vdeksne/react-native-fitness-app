@@ -35,6 +35,13 @@ export default function Layout() {
           ),
         }}
       />
+      {/* Hidden detail screen (accessed via push, not shown in tab bar) */}
+      <Tabs.Screen
+        name="exercise-detail"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="history"
         options={{

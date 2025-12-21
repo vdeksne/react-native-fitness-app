@@ -121,6 +121,40 @@ export default function Workout() {
   }, []);
 
   const [quote, setQuote] = useState<string>("Push hard. Log every rep.");
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statError, setStatError] = useState<string | null>(null);
+  const [workouts, setWorkouts] = useState<
+    {
+      _id: string;
+      date?: string;
+      durationMin?: number;
+      exercises?: {
+        name?: string;
+        sets?: { reps?: number; weight?: number; weightUnit?: string }[];
+      }[];
+    }[]
+  >([]);
+
+  const loadWorkouts = useCallback(async () => {
+    try {
+      setLoadingStats(true);
+      setStatError(null);
+      const data = await readClient.fetch(
+        `*[_type == "workout"] | order(coalesce(date, _createdAt) desc)[0..9]{
+          _id,
+          date,
+          durationMin,
+          exercises[]{ "name": exercise->name, sets[]{reps, weight, weightUnit} }
+        }`
+      );
+      setWorkouts(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setStatError("Could not load workout stats.");
+      setWorkouts([]);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [readClient]);
 
   useEffect(() => {
     pulse.value = withRepeat(
@@ -129,7 +163,8 @@ export default function Workout() {
       true
     );
     fetchQuote();
-  }, [pulse, fetchQuote]);
+    loadWorkouts();
+  }, [pulse, fetchQuote, loadWorkouts]);
 
   // --- FIX for workoutTimer undefined ---
   const [workoutTimer, setWorkoutTimer] = useState(0);
@@ -424,7 +459,7 @@ export default function Workout() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.gymBanner, pulseStyle]}>
-        <Ionicons name="barbell" size={16} color="#1E3DF0" />
+        <Ionicons name="barbell" size={16} color="#222" />
         <Text style={styles.gymBannerText}>{quote}</Text>
       </Animated.View>
       <View style={styles.header}>
@@ -536,7 +571,7 @@ export default function Workout() {
                 style={[
                   styles.cardHeader,
                   ex.completed && {
-                    backgroundColor: "#F4FAF6",
+                    backgroundColor: "#F4F4F4",
                     borderRadius: 8,
                   },
                 ]}
@@ -563,12 +598,14 @@ export default function Workout() {
                     size={18}
                     color="#111"
                   />
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => removeExercise(ex.key)}
-                  >
-                    <Ionicons name="trash" size={18} color="#C83737" />
-                  </TouchableOpacity>
+                  {ex.expanded ? (
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => removeExercise(ex.key)}
+                    >
+                      <Ionicons name="trash" size={18} color="#444" />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </TouchableOpacity>
 
@@ -632,7 +669,7 @@ export default function Workout() {
                           style={styles.iconBtnSmall}
                           onPress={() => removeSet(ex.key, idx)}
                         >
-                          <Ionicons name="trash" size={16} color="#C83737" />
+                          <Ionicons name="trash" size={16} color="#444" />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -648,7 +685,7 @@ export default function Workout() {
                   <TouchableOpacity
                     style={[
                       styles.finishExerciseBtn,
-                      ex.completed && { backgroundColor: "#E5F5EC" },
+                      ex.completed && { backgroundColor: "#E6E6E6" },
                     ]}
                     onPress={() => markExerciseComplete(ex.key)}
                     disabled={ex.completed}
@@ -656,7 +693,7 @@ export default function Workout() {
                     <Text
                       style={[
                         styles.finishExerciseText,
-                        ex.completed && { color: "#2FA44F" },
+                        ex.completed && { color: "#333" },
                       ]}
                     >
                       {ex.completed
@@ -680,7 +717,7 @@ export default function Workout() {
             </View>
             {loadingExercises ? (
               <View style={styles.loaderRow}>
-                <ActivityIndicator color="#1E3DF0" />
+                <ActivityIndicator color="#555" />
                 <Text style={styles.loaderText}>Loading...</Text>
               </View>
             ) : error ? (
@@ -733,7 +770,7 @@ export default function Workout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: "#F5F5F5",
   },
   header: {
     paddingHorizontal: 16,
@@ -762,7 +799,7 @@ const styles = StyleSheet.create({
   },
   unitToggle: {
     flexDirection: "row",
-    backgroundColor: "#1F2A44",
+    backgroundColor: "#2C2C2C",
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -771,10 +808,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   unitBtnActive: {
-    backgroundColor: "#3D5AFE",
+    backgroundColor: "#111",
   },
   unitText: {
-    color: "#C7D0E0",
+    color: "#E0E0E0",
     fontSize: 12,
     fontWeight: "600",
   },
@@ -782,7 +819,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   endBtn: {
-    backgroundColor: "#C83737",
+    backgroundColor: "#333",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -809,6 +846,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
     marginBottom: 16,
+    overflow: "hidden",
   },
   cardHeader: {
     flexDirection: "row",
@@ -830,7 +868,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#FDEAEA",
+    backgroundColor: "#E6E6E6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -843,42 +881,44 @@ const styles = StyleSheet.create({
   emptySet: {
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#C8D2E5",
+    borderColor: "#D0D0D0",
     borderRadius: 10,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 10,
-    backgroundColor: "#F9FBFF",
+    backgroundColor: "#F7F7F7",
   },
   emptySetText: {
-    color: "#7A869A",
+    color: "#666",
     fontSize: 13,
   },
   addSetBtn: {
     borderWidth: 1,
-    borderColor: "#3D5AFE",
+    borderColor: "#444",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#F1F4FF",
+    backgroundColor: "#F2F2F2",
   },
   addSetText: {
-    color: "#1E3DF0",
+    color: "#222",
     fontSize: 14,
     fontWeight: "700",
   },
   setRow: {
     borderWidth: 1,
-    borderColor: "#E5E9F2",
+    borderColor: "#DADADA",
     borderRadius: 12,
     padding: 10,
+    paddingRight: 12,
     marginBottom: 10,
-    backgroundColor: "#F7FBFF",
+    backgroundColor: "#F7F7F7",
+    overflow: "hidden",
   },
   setIndex: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1E3DF0",
+    color: "#333",
     marginBottom: 6,
   },
   setInputs: {
@@ -896,7 +936,7 @@ const styles = StyleSheet.create({
   },
   setInput: {
     borderWidth: 1,
-    borderColor: "#D9DFEA",
+    borderColor: "#D6D6D6",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -904,7 +944,7 @@ const styles = StyleSheet.create({
   },
   finishExerciseBtn: {
     marginTop: 10,
-    backgroundColor: "#1E3DF0",
+    backgroundColor: "#333",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
@@ -915,8 +955,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   finishedPill: {
-    backgroundColor: "#E5F5EC",
-    color: "#2FA44F",
+    backgroundColor: "#E6E6E6",
+    color: "#333",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 9,
@@ -932,7 +972,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: "#1E3DF0",
+    backgroundColor: "#333",
   },
   unitToggleSmallText: {
     color: "#fff",
@@ -945,28 +985,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: "#ECF3FF",
+    backgroundColor: "#F5F5F5",
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#D1DEFF",
+    borderColor: "#E0E0E0",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
   },
   gymBannerText: {
-    color: "#1E3DF0",
+    flex: 1,
+    color: "#222",
     fontWeight: "700",
     fontSize: 12,
+    flexWrap: "wrap",
+    lineHeight: 16,
   },
   iconBtnSmall: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#FDEAEA",
+    backgroundColor: "#E6E6E6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1012,11 +1055,11 @@ const styles = StyleSheet.create({
     color: "#444",
   },
   dayListTextActive: {
-    color: "#1E3DF0",
+    color: "#111",
     fontWeight: "700",
   },
   primaryBtn: {
-    backgroundColor: "#2F6DF6",
+    backgroundColor: "#222",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
@@ -1028,7 +1071,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   successBtn: {
-    backgroundColor: "#2FA44F",
+    backgroundColor: "#444",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
@@ -1060,7 +1103,7 @@ const styles = StyleSheet.create({
   exerciseListItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F2F6",
+    borderBottomColor: "#E6E6E6",
   },
   exerciseListName: {
     fontSize: 14,
@@ -1083,7 +1126,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   errorText: {
-    color: "#C83737",
+    color: "#555",
     fontSize: 13,
   },
   starter: {

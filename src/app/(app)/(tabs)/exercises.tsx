@@ -7,10 +7,17 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Linking,
 } from "react-native";
 import Constants from "expo-constants";
 import ExerciseCard from "../../components/ExerciseCard";
 import { client } from "../../../../sanity/client";
+import { useRouter } from "expo-router";
+// @ts-ignore expo-image-picker types resolved at runtime
+import * as ImagePicker from "expo-image-picker";
 
 type ApiExercise = {
   exerciseId: string;
@@ -41,12 +48,58 @@ export type ExerciseItem = {
   trainingDays?: string[];
 };
 
+const muscleOptions = [
+  { label: "Glutes (Gluteus Maximus)", value: "gluteusMaximus" },
+  { label: "Glutes (Gluteus Medius)", value: "gluteusMedius" },
+  { label: "Posterior Chain", value: "posteriorChain" },
+  { label: "Hamstrings", value: "hamstrings" },
+  { label: "Adductors (Inner Thigh)", value: "adductorsInnerThigh" },
+  { label: "Quadriceps (Quads)", value: "quadriceps" },
+  { label: "Calves", value: "calves" },
+  { label: "Shoulders (Deltoids)", value: "deltoids" },
+  { label: "Shoulders (Anterior Deltoid)", value: "anteriorDeltoid" },
+  { label: "Arms (Triceps)", value: "triceps" },
+  { label: "Arms (Biceps)", value: "biceps" },
+  { label: "Chest Upper", value: "pecMajorUpper" },
+  { label: "Chest Mid", value: "pecMajorMid" },
+  { label: "Chest Lower", value: "pecMajorLower" },
+  { label: "Chest Minor", value: "pecMinor" },
+  { label: "Back (Lats)", value: "latissimusDorsi" },
+  { label: "Back (Rhomboids)", value: "rhomboids" },
+  { label: "Back (Lower Back)", value: "lowerBack" },
+  { label: "Core (Lower Abs)", value: "lowerAbs" },
+  { label: "Core (Upper Abs)", value: "upperAbs" },
+  { label: "Core (Obliques)", value: "obliques" },
+  { label: "Core (Transverse Abdominis)", value: "transverseAbdominis" },
+];
+
+const dayOptions = [
+  { label: "Legs & Glutes Day", value: "legsGlutesDay" },
+  { label: "Shoulders & Arms Day", value: "shouldersArmsDay" },
+  { label: "Back Day", value: "backDay" },
+  { label: "Chest & Arms Day", value: "chestArmsDay" },
+  { label: "Glutes & Hamstrings Day", value: "glutesHamstringsDay" },
+  { label: "Abs / Core Day", value: "absCoreDay" },
+];
+
 export default function Exercises() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"api" | "local">("api");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ExerciseItem[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newDifficulty, setNewDifficulty] = useState("");
+  const [newMuscles, setNewMuscles] = useState<string[]>([]);
+  const [newDays, setNewDays] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [newImageUri, setNewImageUri] = useState("");
+  const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [newIsActive, setNewIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const apiKey =
     process.env.EXPO_PUBLIC_EXERCISEDB_KEY ||
@@ -127,24 +180,6 @@ export default function Exercises() {
     setError(null);
     try {
       const q = query.trim();
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/385971b8-cc31-45e9-9e03-082c407e98ee",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "debug-session",
-            runId: "pre-fix-1",
-            hypothesisId: "H1",
-            location: "exercises.tsx:fetchExercises:start",
-            message: "fetchExercises start",
-            data: { source, query: q },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       if (source === "api") {
         const url = `${baseUrl}/exercises/search?search=${encodeURIComponent(
           q
@@ -165,39 +200,6 @@ export default function Exercises() {
         if (!Array.isArray(data)) {
           throw new Error("Unexpected API response shape");
         }
-
-        // #region agent log
-        const sampleRaw = data?.[0];
-        fetch(
-          "http://127.0.0.1:7242/ingest/385971b8-cc31-45e9-9e03-082c407e98ee",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "debug-session",
-              runId: "pre-fix-1",
-              hypothesisId: "H2",
-              location: "exercises.tsx:fetchExercises:apiRaw",
-              message: "API raw sample",
-              data: sampleRaw
-                ? {
-                    name: sampleRaw.name,
-                    target: (sampleRaw as any).target,
-                    targetMuscles: sampleRaw.targetMuscles,
-                    secondaryMuscle: (sampleRaw as any).secondaryMuscle,
-                    secondaryMuscles: sampleRaw.secondaryMuscles,
-                    bodyPart: (sampleRaw as any).bodyPart,
-                    bodyParts: sampleRaw.bodyParts,
-                    equipment: (sampleRaw as any).equipment,
-                    equipments: sampleRaw.equipments,
-                    imageUrl: sampleRaw.imageUrl,
-                  }
-                : null,
-              timestamp: Date.now(),
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
 
         const mapped: ExerciseItem[] = data.map((ex) => ({
           name: ex.name,
@@ -227,74 +229,9 @@ export default function Exercises() {
             : undefined,
           video: ex.videoUrl,
         }));
-        // #region agent log
-        const sampleMapped = mapped?.[0];
-        fetch(
-          "http://127.0.0.1:7242/ingest/385971b8-cc31-45e9-9e03-082c407e98ee",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "debug-session",
-              runId: "pre-fix-1",
-              hypothesisId: "H3",
-              location: "exercises.tsx:fetchExercises:mappedSample",
-              message: "Mapped sample after processing",
-              data: sampleMapped
-                ? {
-                    name: sampleMapped.name,
-                    muscle: sampleMapped.muscle,
-                    type: sampleMapped.type,
-                    targets: sampleMapped.targets,
-                    secondaryTargets: sampleMapped.secondaryTargets,
-                    bodyParts: sampleMapped.bodyParts,
-                    equipments: sampleMapped.equipments,
-                  }
-                : null,
-              timestamp: Date.now(),
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/385971b8-cc31-45e9-9e03-082c407e98ee",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "debug-session",
-              runId: "pre-fix-1",
-              hypothesisId: "H1",
-              location: "exercises.tsx:fetchExercises:setItems",
-              message: "Setting items from API",
-              data: { count: mapped.length },
-              timestamp: Date.now(),
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
         setItems(mapped);
       } else {
         const local = await fetchLocalExercises(q);
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/385971b8-cc31-45e9-9e03-082c407e98ee",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "debug-session",
-              runId: "pre-fix-1",
-              hypothesisId: "H1",
-              location: "exercises.tsx:fetchExercises:setItemsLocal",
-              message: "Setting items from local",
-              data: { count: local.length },
-              timestamp: Date.now(),
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
         setItems(local);
       }
     } catch (err: any) {
@@ -306,8 +243,120 @@ export default function Exercises() {
   }, [apiKey, baseUrl, fetchLocalExercises, hostHeader, query, source]);
 
   const renderItem = ({ item }: { item: ExerciseItem }) => (
-    <ExerciseCard item={item} />
+    <TouchableOpacity
+      onPress={() =>
+        router.push({
+          pathname: "exercise-detail",
+          params: {
+            name: item.name,
+            description: item.description,
+            difficulty: item.difficulty,
+            image: item.image || "",
+            video: item.video || "",
+            muscles: (item.majorMuscleGroups || item.targets || []).join(","),
+            days: (item.trainingDays || item.bodyParts || []).join(","),
+            type: item.type || item.muscle || "",
+          },
+        })
+      }
+      activeOpacity={0.8}
+    >
+      <ExerciseCard item={item} />
+    </TouchableOpacity>
   );
+
+  const toggleFromList = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
+  const addExercise = async () => {
+    if (!newName.trim()) {
+      Alert.alert("Missing name", "Please enter a name for the exercise.");
+      return;
+    }
+    if (!newMuscles.length) {
+      Alert.alert(
+        "Pick muscle groups",
+        "Select at least one major muscle group."
+      );
+      return;
+    }
+    if (!newDays.length) {
+      Alert.alert("Pick training days", "Select at least one training day.");
+      return;
+    }
+    if (!sanityToken) {
+      Alert.alert(
+        "No write token",
+        "Set EXPO_PUBLIC_SANITY_TOKEN to add exercises to the database."
+      );
+      return;
+    }
+    try {
+      setSaving(true);
+      setError(null);
+      let imageRef: string | undefined;
+      const targetImage = newImageUri.trim() || newImageUrl.trim();
+
+      if (targetImage) {
+        try {
+          const res = await fetch(targetImage);
+          const blob = await res.blob();
+          const asset = await client
+            .withConfig({ token: sanityToken, dataset: sanityDataset })
+            .assets.upload("image", blob, {
+              filename: `exercise-${Date.now()}.jpg`,
+            });
+          imageRef = asset?._id;
+        } catch (e) {
+          Alert.alert("Image upload failed", "We could not upload that image.");
+        }
+      }
+
+      const doc: any = {
+        _type: "exercise",
+        name: newName.trim(),
+        description: newDescription.trim() || "No description provided.",
+        difficulty: newDifficulty.trim() || "unknown",
+        majorMuscleGroups: newMuscles,
+        trainingDays: newDays,
+        isActive: newIsActive,
+      };
+      if (newVideoUrl.trim()) doc.videoUrl = newVideoUrl.trim();
+      if (imageRef) {
+        doc.image = {
+          _type: "image",
+          asset: { _type: "reference", _ref: imageRef },
+        };
+      }
+
+      await client
+        .withConfig({ token: sanityToken, dataset: sanityDataset })
+        .create(doc);
+
+      Alert.alert("Saved", "Exercise added to your database.", [
+        { text: "OK", onPress: () => {} },
+      ]);
+      setNewName("");
+      setNewDescription("");
+      setNewDifficulty("");
+      setNewMuscles([]);
+      setNewDays([]);
+      setNewImageUrl("");
+      setNewImageUri("");
+      setNewVideoUrl("");
+      setNewIsActive(true);
+      setShowAddForm(false);
+
+      if (source === "local") {
+        const refreshed = await fetchLocalExercises(query || newName);
+        setItems(refreshed);
+      }
+    } catch (e: any) {
+      setError("Could not add exercise.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -340,6 +389,188 @@ export default function Exercises() {
         </Text>
       </View>
 
+      <View style={styles.addBox}>
+        {!showAddForm ? (
+          <TouchableOpacity onPress={() => setShowAddForm(true)}>
+            <Text style={styles.addButton}>+ Add new exercise</Text>
+          </TouchableOpacity>
+        ) : (
+          <ScrollView
+            style={{ maxHeight: 420 }}
+            contentContainerStyle={{ paddingBottom: 8 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.addTitle}>New Exercise</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              value={newName}
+              onChangeText={setNewName}
+            />
+            <TextInput
+              style={[styles.input, styles.multiline]}
+              placeholder="Description"
+              value={newDescription}
+              onChangeText={setNewDescription}
+              multiline
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Difficulty (optional)"
+              value={newDifficulty}
+              onChangeText={setNewDifficulty}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Image URL (optional)"
+              value={newImageUrl}
+              onChangeText={setNewImageUrl}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.pickButton}
+              onPress={async () => {
+                const perm =
+                  await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (perm.status !== "granted") {
+                  Alert.alert(
+                    "Permission needed",
+                    "Please allow photo access to pick an image."
+                  );
+                  return;
+                }
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets?.length) {
+                  setNewImageUri(result.assets[0].uri);
+                  setNewImageUrl("");
+                }
+              }}
+            >
+              <Text style={styles.pickButtonText}>Pick image from device</Text>
+            </TouchableOpacity>
+            {newImageUrl.trim() ? (
+              <Image
+                source={{ uri: newImageUrl.trim() }}
+                style={styles.preview}
+                resizeMode="cover"
+              />
+            ) : newImageUri.trim() ? (
+              <Image
+                source={{ uri: newImageUri.trim() }}
+                style={styles.preview}
+                resizeMode="cover"
+              />
+            ) : null}
+
+            <View style={styles.pickerBox}>
+              <Text style={styles.pickerLabel}>Major muscle groups</Text>
+              {muscleOptions.map((opt) => {
+                const sel = newMuscles.includes(opt.value);
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={styles.pickerRow}
+                    onPress={() =>
+                      setNewMuscles((prev) => toggleFromList(prev, opt.value))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.pickerCheck,
+                        sel && styles.pickerCheckActive,
+                      ]}
+                    >
+                      {sel ? "☑" : "☐"}
+                    </Text>
+                    <Text style={styles.pickerText}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.pickerBox}>
+              <Text style={styles.pickerLabel}>Training days</Text>
+              {dayOptions.map((opt) => {
+                const sel = newDays.includes(opt.value);
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={styles.pickerRow}
+                    onPress={() =>
+                      setNewDays((prev) => toggleFromList(prev, opt.value))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.pickerCheck,
+                        sel && styles.pickerCheckActive,
+                      ]}
+                    >
+                      {sel ? "☑" : "☐"}
+                    </Text>
+                    <Text style={styles.pickerText}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Video URL (optional)"
+              value={newVideoUrl}
+              onChangeText={setNewVideoUrl}
+            />
+
+            <View
+              style={[styles.toggleRow, { justifyContent: "space-between" }]}
+            >
+              <Text style={styles.addLabel}>Is Active</Text>
+              <TouchableOpacity onPress={() => setNewIsActive((v) => !v)}>
+                <Text style={styles.addButtonGhost}>
+                  {newIsActive ? "Yes" : "No"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.addHint}>
+              Saves to your Sanity DB (requires write token).
+            </Text>
+            <View style={styles.addActions}>
+              <TouchableOpacity
+                style={[
+                  styles.addButtonPrimary,
+                  (!sanityToken || saving) && { opacity: 0.5 },
+                ]}
+                onPress={saving ? undefined : addExercise}
+              >
+                <Text style={styles.addButtonPrimaryText}>
+                  {saving ? "Saving..." : "Save exercise"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.addButtonGhostBox}
+                onPress={() => {
+                  setShowAddForm(false);
+                  setNewName("");
+                  setNewDescription("");
+                  setNewDifficulty("");
+                  setNewMuscles([]);
+                  setNewDays([]);
+                  setNewVideoUrl("");
+                  setNewIsActive(true);
+                }}
+              >
+                <Text style={styles.addButtonGhostText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        )}
+      </View>
+
       {loading && <ActivityIndicator size="small" color="#000" />}
       {error && (
         <Text style={styles.error} onPress={() => Alert.alert("Error", error)}>
@@ -363,8 +594,8 @@ export default function Exercises() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+  container: { flex: 1, padding: 16, backgroundColor: "#F5F5F5" },
+  title: { fontSize: 22, fontWeight: "800", marginBottom: 12, color: "#111" },
   searchRow: { marginBottom: 12 },
   toggleRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   toggle: {
@@ -372,24 +603,128 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#CFCFCF",
     color: "#333",
   },
   toggleActive: {
-    backgroundColor: "#000",
+    backgroundColor: "#222",
     color: "#fff",
-    borderColor: "#000",
+    borderColor: "#222",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#f9f9f9",
+    borderColor: "#E0E0E0",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    backgroundColor: "#fff",
+    color: "#111",
+    marginBottom: 10,
   },
   searchHint: { marginTop: 4, fontSize: 12, color: "#666" },
   empty: { textAlign: "center", color: "#777", marginTop: 20 },
-  error: { color: "#b00020", marginVertical: 8 },
+  error: { color: "#555", marginVertical: 8 },
+  addBox: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E6E6E6",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 18,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  addTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 12,
+  },
+  addHint: { fontSize: 12, color: "#666", marginBottom: 10 },
+  addButton: {
+    backgroundColor: "#E0E0E0",
+    color: "#111",
+    textAlign: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  addLabel: { fontSize: 13, color: "#444" },
+  pickerBox: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "#fff",
+  },
+  pickerLabel: {
+    fontSize: 13,
+    color: "#444",
+    marginBottom: 6,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    gap: 8,
+  },
+  pickerCheck: { fontSize: 14, color: "#666" },
+  pickerCheckActive: { color: "#111", fontWeight: "700" },
+  pickerText: { fontSize: 14, color: "#222" },
+  addActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  addButtonPrimary: {
+    flex: 1,
+    backgroundColor: "#222",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  addButtonPrimaryText: { color: "#fff", fontWeight: "700" },
+  addButtonGhostBox: {
+    flex: 1,
+    backgroundColor: "#E6E6E6",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  addButtonGhostText: { color: "#111", fontWeight: "700" },
+  addButtonGhost: {
+    backgroundColor: "#E6E6E6",
+    color: "#111",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  pickButton: {
+    backgroundColor: "#E0E0E0",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  pickButtonText: {
+    color: "#111",
+    fontWeight: "700",
+  },
+  multiline: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  preview: {
+    width: "100%",
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: "#EEE",
+  },
 });

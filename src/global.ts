@@ -1,10 +1,10 @@
-import "./shims/platform-constants"; // ensure PlatformConstants exists before anything else
-import { Slot } from "expo-router";
+// Global shim to ensure PlatformConstants exists even when native modules are missing
+// (e.g., web/Hermes builds without native PlatformConstants).
+
 import { Platform, NativeModules } from "react-native";
 
-// Shim: ensure PlatformConstants exists for any platform to avoid TurboModuleRegistry crashes
-// when bundling/running on web or mismatched native deps.
 const existingProxy = (global as any).__turboModuleProxy;
+
 (global as any).__turboModuleProxy = (name: string) => {
   if (name === "PlatformConstants") {
     const defaults =
@@ -32,7 +32,7 @@ const existingProxy = (global as any).__turboModuleProxy;
   return existingProxy ? existingProxy(name) : null;
 };
 
-// Also provide legacy NativeModules fallback for PlatformConstants (used if turbo proxy missing).
+// Legacy NativeModules fallback
 (NativeModules as any).PlatformConstants =
   (NativeModules as any).PlatformConstants || {
     getConstants: () => ({
@@ -45,6 +45,3 @@ const existingProxy = (global as any).__turboModuleProxy;
     }),
   };
 
-export default function Layout() {
-  return <Slot />;
-}

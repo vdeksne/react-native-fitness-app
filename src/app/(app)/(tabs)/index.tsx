@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { client, config as sanityConfig } from "../../../../sanity/client";
 
@@ -24,6 +25,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
+  const [viewMode, setViewMode] = useState<"week" | "month" | "year">("month");
 
   const dataset = sanityConfig.dataset || "fitness-app";
   const apiVersion = sanityConfig.apiVersion || "2023-10-12";
@@ -128,6 +130,98 @@ export default function Page() {
     return `${weekday}, ${month} ${day}`;
   }, []);
 
+  const workoutDateSet = useMemo(() => {
+    const set = new Set<string>();
+    workouts.forEach((w) => {
+      if (w.date) {
+        const d = new Date(w.date);
+        set.add(d.toDateString());
+      }
+    });
+    return set;
+  }, [workouts]);
+
+  const calendarMonthLabel = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+  }, []);
+
+  const calendarDays = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const start = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leadingEmpty = start.getDay(); // 0 = Sunday
+    const days: { key: string; label: string; isToday: boolean; hasWorkout: boolean }[] =
+      [];
+
+    for (let i = 0; i < leadingEmpty; i++) {
+      days.push({
+        key: `empty-${i}`,
+        label: "",
+        isToday: false,
+        hasWorkout: false,
+      });
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const current = new Date(year, month, d);
+      const isToday = current.toDateString() === new Date().toDateString();
+      const hasWorkout = workoutDateSet.has(current.toDateString());
+      days.push({
+        key: `day-${d}`,
+        label: String(d),
+        isToday,
+        hasWorkout,
+      });
+    }
+    return days;
+  }, [workoutDateSet]);
+
+  const weekDays = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - now.getDay()); // Sunday start
+    const days: { key: string; label: string; isToday: boolean; hasWorkout: boolean }[] =
+      [];
+    for (let i = 0; i < 7; i++) {
+      const current = new Date(start);
+      current.setDate(start.getDate() + i);
+      const isToday = current.toDateString() === now.toDateString();
+      const hasWorkout = workoutDateSet.has(current.toDateString());
+      days.push({
+        key: `week-${i}`,
+        label: current.toLocaleDateString(undefined, { weekday: "short", day: "numeric" }),
+        isToday,
+        hasWorkout,
+      });
+    }
+    return days;
+  }, [workoutDateSet]);
+
+  const yearMonths = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const counts = Array.from({ length: 12 }, () => 0);
+    workouts.forEach((w) => {
+      if (w.date) {
+        const d = new Date(w.date);
+        if (d.getFullYear() === year) {
+          counts[d.getMonth()] += 1;
+        }
+      }
+    });
+    return counts.map((count, idx) => ({
+      key: `month-${idx}`,
+      label: new Date(year, idx, 1).toLocaleDateString(undefined, { month: "short" }),
+      count,
+    }));
+  }, [workouts]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -154,7 +248,7 @@ export default function Page() {
         {/* Workout Statistics */}
         <Text style={styles.sectionTitle}>Workout Statistics</Text>
         {loading ? (
-          <ActivityIndicator color="#1E3DF0" />
+          <ActivityIndicator color="#111" />
         ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : (
@@ -192,10 +286,114 @@ export default function Page() {
           </View>
         )}
 
+        {/* Calendar */}
+        <Text style={styles.sectionTitle}>Workout Calendar</Text>
+        <View style={[styles.card, styles.calendarCard]}>
+          <View style={styles.viewTabs}>
+            {["week", "month", "year"].map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[
+                  styles.viewTab,
+                  viewMode === mode && styles.viewTabActive,
+                ]}
+                onPress={() => setViewMode(mode as "week" | "month" | "year")}
+              >
+                <Text
+                  style={[
+                    styles.viewTabText,
+                    viewMode === mode && styles.viewTabTextActive,
+                  ]}
+                >
+                  {mode[0].toUpperCase() + mode.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.calendarHeader}>
+            <Text style={styles.calendarMonth}>{calendarMonthLabel}</Text>
+            <Text style={styles.calendarLegend}>
+              ● Workout | ○ Today
+            </Text>
+          </View>
+          {viewMode === "week" && (
+            <View style={styles.weekGrid}>
+              {weekDays.map((day) => (
+                <View key={day.key} style={styles.weekCell}>
+                  <Text style={styles.weekLabel}>{day.label}</Text>
+                  <View
+                    style={[
+                      styles.calendarDot,
+                      day.hasWorkout && styles.calendarDotActive,
+                      day.isToday && styles.calendarDotToday,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        (day.hasWorkout || day.isToday) && styles.calendarDayTextActive,
+                      ]}
+                    >
+                      {day.label.split(" ")[1]}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {viewMode === "month" && (
+            <>
+              <View style={styles.calendarWeekRow}>
+                {["S", "M", "T", "W", "T", "F", "S"].map((d, idx) => (
+                  <Text key={`${d}-${idx}`} style={styles.calendarWeekday}>
+                    {d}
+                  </Text>
+                ))}
+              </View>
+              <View style={styles.calendarGrid}>
+                {calendarDays.map((day) => (
+                  <View key={day.key} style={styles.calendarCell}>
+                    {day.label ? (
+                      <View
+                        style={[
+                          styles.calendarDot,
+                          day.hasWorkout && styles.calendarDotActive,
+                          day.isToday && styles.calendarDotToday,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            (day.hasWorkout || day.isToday) && styles.calendarDayTextActive,
+                          ]}
+                        >
+                          {day.label}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {viewMode === "year" && (
+            <View style={styles.yearGrid}>
+              {yearMonths.map((m) => (
+                <View key={m.key} style={styles.yearCell}>
+                  <Text style={styles.yearLabel}>{m.label}</Text>
+                  <Text style={styles.yearCount}>{m.count} workouts</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Last Workouts */}
         <Text style={styles.sectionTitle}>Last Workouts</Text>
         {loading ? (
-          <ActivityIndicator color="#1E3DF0" />
+          <ActivityIndicator color="#111" />
         ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : (
@@ -217,7 +415,7 @@ export default function Page() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#F4F4F4",
   },
   scroll: {
     flex: 1,
@@ -241,7 +439,7 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 16,
-    color: "#666",
+    color: "#555",
     marginBottom: 2,
   },
   date: {
@@ -266,9 +464,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#EAEAEA",
+    borderColor: "#DCDCDC",
     shadowColor: "#000",
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
   },
@@ -279,7 +477,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 13,
-    color: "#777",
+    color: "#666",
     marginBottom: 8,
   },
   cardValue: {
@@ -290,13 +488,141 @@ const styles = StyleSheet.create({
   cardSubValue: {
     marginTop: 4,
     fontSize: 12,
+    color: "#666",
+  },
+  calendarCard: {
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  calendarMonth: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  calendarLegend: {
+    fontSize: 12,
+    color: "#666",
+  },
+  calendarWeekRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  calendarWeekday: {
+    width: "14.28%",
+    textAlign: "center",
+    fontSize: 12,
     color: "#777",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarCell: {
+    width: "14.28%",
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  calendarDot: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F2F2F2",
+    borderWidth: 1,
+    borderColor: "#D1D1D1",
+  },
+  calendarDotActive: {
+    backgroundColor: "#111",
+    borderColor: "#111",
+  },
+  calendarDotToday: {
+    borderColor: "#111",
+  },
+  calendarDayText: {
+    fontSize: 13,
+    color: "#444",
+    fontWeight: "600",
+  },
+  calendarDayTextActive: {
+    color: "#F5F5F5",
+  },
+  weekGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  weekCell: {
+    flex: 1,
+    alignItems: "center",
+    gap: 6,
+  },
+  weekLabel: {
+    fontSize: 12,
+    color: "#555",
+  },
+  yearGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 6,
+  },
+  yearCell: {
+    width: "30%",
+    backgroundColor: "#F3F3F3",
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#DADADA",
+  },
+  yearLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
+  },
+  yearCount: {
+    fontSize: 12,
+    color: "#555",
+  },
+  viewTabs: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  viewTab: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D8D8D8",
+    backgroundColor: "#F2F2F2",
+  },
+  viewTabActive: {
+    backgroundColor: "#DCDCDC",
+    borderColor: "#BDBDBD",
+  },
+  viewTabText: {
+    fontSize: 13,
+    color: "#444",
+    fontWeight: "600",
+  },
+  viewTabTextActive: {
+    color: "#111",
   },
   placeholderChart: {
     marginTop: 8,
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#FDE7EB",
+    backgroundColor: "#E5E5E5",
   },
   list: {
     gap: 12,
