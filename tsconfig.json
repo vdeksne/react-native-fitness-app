@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "types": ["react", "react-native", "nativewind/types"],
     "paths": {
       "@/*": [
         "./src/*"

@@ -7,13 +7,19 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  Alert,
+  TextInput,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { client } from "../../../../sanity/client";
+import { useRouter } from "expo-router";
+import { useAuthContext } from "../../../context/AuthContext";
 
 const dayLabels = ["5", "6", "7", "Now, July 8", "9", "10", "11"];
 
 export default function Profile() {
+  const router = useRouter();
+  const { email, setEmail } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workouts, setWorkouts] = useState<
@@ -122,6 +128,22 @@ export default function Profile() {
   }, [stats]);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsMode, setSettingsMode] = useState<"menu" | "set" | "reset">(
+    "menu"
+  );
+  const [formEmail, setFormEmail] = useState(email || "");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+
+  const fakeNetwork = (message: string) =>
+    new Promise<void>((resolve) => {
+      setTimeout(() => {
+        Alert.alert("Success", message, [{ text: "OK" }], {
+          cancelable: true,
+        });
+        resolve();
+      }, 600);
+    });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -138,21 +160,166 @@ export default function Profile() {
           >
             <View style={styles.settingsGrabber} />
             <Text style={styles.settingsTitle}>Settings</Text>
-            <TouchableOpacity
-              style={styles.settingsAction}
-              onPress={() => {
-                // TODO: wire real logout handler
-              }}
-            >
-              <Ionicons name="log-out-outline" size={18} color="#C83737" />
-              <Text style={styles.settingsActionText}>Log out</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.settingsCancel}
-              onPress={() => setShowSettings(false)}
-            >
-              <Text style={styles.settingsCancelText}>Close</Text>
-            </TouchableOpacity>
+
+            {settingsMode === "menu" && (
+              <>
+                <TouchableOpacity
+                  style={styles.settingsActionSecondary}
+                  onPress={() => {
+                    setFormEmail(email || "");
+                    setNewPass("");
+                    setConfirmPass("");
+                    setSettingsMode("set");
+                  }}
+                >
+                  <Ionicons name="key-outline" size={18} color="#111" />
+                  <Text style={styles.settingsActionSecondaryText}>
+                    Set password
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.settingsActionSecondary}
+                  onPress={() => {
+                    setFormEmail(email || "");
+                    setSettingsMode("reset");
+                  }}
+                >
+                  <Ionicons name="refresh-outline" size={18} color="#111" />
+                  <Text style={styles.settingsActionSecondaryText}>
+                    Reset password
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.settingsAction}
+                  onPress={() => {
+                    setEmail(null);
+                    setShowSettings(false);
+                    router.replace("/sign-in");
+                  }}
+                >
+                  <Ionicons name="log-out-outline" size={18} color="#C83737" />
+                  <Text style={styles.settingsActionText}>Log out</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {settingsMode === "set" && (
+              <View style={styles.formBlock}>
+                <Text style={styles.formLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formEmail}
+                  onChangeText={setFormEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="Email"
+                  editable={!email}
+                  selectTextOnFocus={!email}
+                />
+                <Text style={styles.formLabel}>New password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newPass}
+                  onChangeText={setNewPass}
+                  secureTextEntry
+                  placeholder="Enter new password"
+                />
+                <Text style={styles.formLabel}>Confirm password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={confirmPass}
+                  onChangeText={setConfirmPass}
+                  secureTextEntry
+                  placeholder="Confirm password"
+                />
+                <TouchableOpacity
+                  style={styles.primaryAction}
+                  onPress={() => {
+                    if (!formEmail) {
+                      Alert.alert("Missing email", "Please enter your email.");
+                      return;
+                    }
+                    if (!newPass || newPass !== confirmPass) {
+                      Alert.alert(
+                        "Password mismatch",
+                        "Please ensure passwords match."
+                      );
+                      return;
+                    }
+                    fakeNetwork(
+                      `Password set for ${formEmail}. (Replace with real endpoint when ready.)`
+                    );
+                    setSettingsMode("menu");
+                  }}
+                >
+                  <Text style={styles.primaryActionText}>Save password</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.settingsCancel}
+                  onPress={() => setSettingsMode("menu")}
+                >
+                  <Text style={styles.settingsCancelText}>Back</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {settingsMode === "reset" && (
+              <View style={styles.formBlock}>
+                <Text style={styles.formLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formEmail}
+                  onChangeText={setFormEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="Email"
+                  editable={!email}
+                  selectTextOnFocus={!email}
+                />
+                <TouchableOpacity
+                  style={styles.primaryAction}
+                  onPress={() => {
+                    if (!formEmail) {
+                      Alert.alert("Missing email", "Please enter your email.");
+                      return;
+                    }
+                    fakeNetwork(
+                      `Reset link sent to ${formEmail}. (Replace with real endpoint when ready.)`
+                    );
+                    setSettingsMode("menu");
+                  }}
+                >
+                  <Text style={styles.primaryActionText}>Send reset link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.settingsCancel}
+                  onPress={() => setSettingsMode("menu")}
+                >
+                  <Text style={styles.settingsCancelText}>Back</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {settingsMode === "menu" && (
+              <TouchableOpacity
+                style={styles.settingsCancel}
+                onPress={() => {
+                  setShowSettings(false);
+                  setSettingsMode("menu");
+                }}
+              >
+                <Text style={styles.settingsCancelText}>Close</Text>
+              </TouchableOpacity>
+            )}
+
+            {settingsMode !== "menu" && (
+              <TouchableOpacity
+                style={styles.settingsCancel}
+                onPress={() => setSettingsMode("menu")}
+              >
+                <Text style={styles.settingsCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       ) : null}
@@ -427,6 +594,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 15,
   },
+  settingsActionSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    backgroundColor: "#F6F7FB",
+    marginBottom: 6,
+  },
+  settingsActionSecondaryText: {
+    color: "#111",
+    fontWeight: "600",
+    fontSize: 14,
+  },
   settingsCancel: {
     marginTop: 14,
     alignSelf: "center",
@@ -437,6 +619,34 @@ const styles = StyleSheet.create({
   },
   settingsCancelText: {
     color: "#111",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  formBlock: {
+    marginTop: 12,
+    gap: 10,
+  },
+  formLabel: {
+    fontSize: 12,
+    color: "#555",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E2E6EE",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+  },
+  primaryAction: {
+    marginTop: 8,
+    backgroundColor: "#1E3DF0",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  primaryActionText: {
+    color: "#fff",
     fontWeight: "700",
     fontSize: 14,
   },

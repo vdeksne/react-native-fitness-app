@@ -16,8 +16,20 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
+import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
-import { client, adminClient } from "../../../../sanity/client";
+import {
+  client,
+  adminClient,
+  config as sanityConfig,
+} from "../../../../sanity/client";
 
 type Unit = "lbs" | "kg";
 
@@ -39,6 +51,8 @@ type ActiveExercise = {
   exerciseId: string;
   name: string;
   sets: SetEntry[];
+  completed: boolean;
+  expanded: boolean;
 };
 
 const trainingDayOptions = [
@@ -70,6 +84,53 @@ export default function Workout() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const dataset = sanityConfig.dataset || "fitness-app";
+  const apiVersion = sanityConfig.apiVersion || "2023-10-12";
+  const readClient = client.withConfig({ dataset, apiVersion });
+  const writeClient = (adminClient || client).withConfig({
+    dataset,
+    apiVersion,
+  });
+
+  const pulse = useSharedValue(1);
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  const fetchQuote = useCallback(async () => {
+    try {
+      const apiKey =
+        Constants.expoConfig?.extra?.apiNinjasKey ||
+        process.env.EXPO_PUBLIC_API_NINJAS_KEY ||
+        process.env.API_NINJAS_KEY;
+      if (!apiKey) return;
+      const res = await fetch(
+        "https://api.api-ninjas.com/v2/randomquotes?categories=success,wisdom",
+        { headers: { "X-Api-Key": apiKey } }
+      );
+      const json = await res.json();
+      if (Array.isArray(json) && json.length > 0) {
+        const first = json[0];
+        const text = first?.quote;
+        const author = first?.author;
+        if (text) setQuote(text + (author ? ` — ${author}` : ""));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [quote, setQuote] = useState<string>("Push hard. Log every rep.");
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1.04, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+    fetchQuote();
+  }, [pulse, fetchQuote]);
+
   // --- FIX for workoutTimer undefined ---
   const [workoutTimer, setWorkoutTimer] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -93,11 +154,49 @@ export default function Workout() {
     [selectedDay]
   );
 
+  const filteredExercises = useMemo(() => {
+    if (!selectedDay) return availableExercises;
+    return availableExercises.filter((ex) =>
+      ex.trainingDays?.includes(selectedDay)
+    );
+  }, [availableExercises, selectedDay]);
+
+  const fetchLastSetForExercise = useCallback(
+    async (exerciseId: string) => {
+      try {
+        const data = await readClient.fetch(
+          `*[_type == "workout" && references($exId)]
+            | order(coalesce(date, _createdAt) desc)[0].exercises[exercise._ref == $exId][0].sets[-1]`,
+          { exId: exerciseId }
+        );
+        const last = data;
+        if (last) {
+          const unitFromLast: Unit = last?.weightUnit === "lbs" ? "lbs" : "kg";
+          return {
+            reps:
+              last?.reps !== undefined && last?.reps !== null
+                ? String(last.reps)
+                : "0",
+            weight:
+              last?.weight !== undefined && last?.weight !== null
+                ? String(last.weight)
+                : "0",
+            unit: unitFromLast || unit,
+          };
+        }
+      } catch (e) {
+        // ignore and fallback to defaults
+      }
+      return null;
+    },
+    [unit]
+  );
+
   const fetchLocalExercises = useCallback(async () => {
     try {
       setLoadingExercises(true);
       setError(null);
-      const data = await client.fetch(
+      const data = await readClient.fetch(
         `*[_type == "exercise" && isActive != false]{_id, name, majorMuscleGroups, trainingDays}`
       );
       const arr: ExerciseOption[] = Array.isArray(data) ? data : [];
@@ -113,17 +212,21 @@ export default function Workout() {
     fetchLocalExercises();
   }, [fetchLocalExercises]);
 
-  const addExerciseToSession = (exerciseId: string) => {
+  const addExerciseToSession = async (exerciseId: string) => {
     const found = availableExercises.find((ex) => ex._id === exerciseId);
     if (!found) return;
     const key = `${exerciseId}-${Date.now()}`;
+    const lastSet = await fetchLastSetForExercise(exerciseId);
+    const baseSet = lastSet || { reps: "0", weight: "0", unit };
     setSessionExercises((prev) => [
       ...prev,
       {
         key,
         exerciseId,
         name: found.name,
-        sets: [{ reps: "0", weight: "0", unit }],
+        sets: [baseSet],
+        completed: false,
+        expanded: true,
       },
     ]);
     setShowExerciseList(false);
@@ -155,7 +258,14 @@ export default function Workout() {
         ex.key === exerciseKey
           ? {
               ...ex,
-              sets: [...ex.sets, { reps: "0", weight: "0", unit }],
+              sets: [
+                ...ex.sets,
+                ex.sets.length > 0
+                  ? { ...ex.sets[ex.sets.length - 1] }
+                  : { reps: "0", weight: "0", unit },
+              ],
+              completed: false,
+              expanded: true,
             }
           : ex
       )
@@ -176,7 +286,27 @@ export default function Workout() {
     setSessionExercises((prev) => prev.filter((ex) => ex.key !== exerciseKey));
   };
 
+  const markExerciseComplete = (exerciseKey: string) => {
+    setSessionExercises((prev) =>
+      prev.map((ex) =>
+        ex.key === exerciseKey
+          ? { ...ex, completed: true, expanded: false }
+          : ex
+      )
+    );
+  };
+
+  const toggleExerciseExpanded = (exerciseKey: string) => {
+    setSessionExercises((prev) =>
+      prev.map((ex) =>
+        ex.key === exerciseKey ? { ...ex, expanded: !ex.expanded } : ex
+      )
+    );
+  };
+
   const handleStart = () => {
+    setQuote("Loading inspiration...");
+    fetchQuote();
     setStarted(true);
     setStartedAt(new Date());
   };
@@ -199,7 +329,6 @@ export default function Workout() {
       Alert.alert("Add exercises", "Please add at least one exercise.");
       return;
     }
-    const clientToUse = adminClient || client;
     const now = new Date();
     const durationMin =
       startedAt != null
@@ -225,7 +354,7 @@ export default function Workout() {
 
     try {
       setSaving(true);
-      await clientToUse.create(payload);
+      await writeClient.create(payload);
       Alert.alert("Saved", "Workout saved to your history.");
       handleEnd();
     } catch (e: any) {
@@ -294,6 +423,10 @@ export default function Workout() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Animated.View style={[styles.gymBanner, pulseStyle]}>
+        <Ionicons name="barbell" size={16} color="#1E3DF0" />
+        <Text style={styles.gymBannerText}>{quote}</Text>
+      </Animated.View>
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Active Workout</Text>
@@ -347,129 +480,6 @@ export default function Workout() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.caption}>
-          {sessionExercises.length}{" "}
-          {sessionExercises.length === 1 ? "exercise" : "exercises"}
-        </Text>
-
-        {sessionExercises.map((ex) => (
-          <View style={styles.card} key={ex.key}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={styles.cardTitle}>{ex.name}</Text>
-                <Text style={styles.cardMeta}>
-                  {ex.sets.length} sets · {ex.sets.length} completed
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => removeExercise(ex.key)}
-              >
-                <Ionicons name="trash" size={18} color="#C83737" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.sectionLabel}>Sets</Text>
-            {ex.sets.length === 0 ? (
-              <TouchableOpacity style={styles.emptySet}>
-                <Text style={styles.emptySetText}>
-                  No sets yet. Add your first set below.
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {ex.sets.map((set, idx) => (
-              <View key={`${ex.key}-set-${idx}`} style={styles.setRow}>
-                <Text style={styles.setIndex}>{idx + 1}</Text>
-                <View style={styles.setInputs}>
-                  <View style={styles.setInputBlock}>
-                    <Text style={styles.setLabel}>Reps</Text>
-                    <TextInput
-                      style={styles.setInput}
-                      keyboardType="numeric"
-                      value={set.reps}
-                      onChangeText={(t) => updateSet(ex.key, idx, "reps", t)}
-                    />
-                  </View>
-                  <View style={styles.setInputBlock}>
-                    <Text style={styles.setLabel}>Weight ({set.unit})</Text>
-                    <TextInput
-                      style={styles.setInput}
-                      keyboardType="numeric"
-                      value={set.weight}
-                      onChangeText={(t) => updateSet(ex.key, idx, "weight", t)}
-                    />
-                  </View>
-                </View>
-                <View style={styles.setActions}>
-                  <TouchableOpacity
-                    style={styles.unitToggleSmall}
-                    onPress={() =>
-                      updateSet(
-                        ex.key,
-                        idx,
-                        "unit",
-                        set.unit === "kg" ? "lbs" : "kg"
-                      )
-                    }
-                  >
-                    <Text style={styles.unitToggleSmallText}>
-                      {set.unit.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconBtnSmall}
-                    onPress={() => removeSet(ex.key, idx)}
-                  >
-                    <Ionicons name="trash" size={16} color="#C83737" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
-            <TouchableOpacity
-              style={styles.addSetBtn}
-              onPress={() => addSet(ex.key)}
-            >
-              <Text style={styles.addSetText}>+ Add Set</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {showExerciseList && (
-          <View style={styles.exerciseList}>
-            <View style={styles.exerciseListHeader}>
-              <Text style={styles.exerciseListTitle}>Choose exercise</Text>
-              <TouchableOpacity onPress={() => setShowExerciseList(false)}>
-                <Ionicons name="close" size={20} color="#111" />
-              </TouchableOpacity>
-            </View>
-            {loadingExercises ? (
-              <View style={styles.loaderRow}>
-                <ActivityIndicator color="#1E3DF0" />
-                <Text style={styles.loaderText}>Loading...</Text>
-              </View>
-            ) : error ? (
-              <Text style={styles.errorText}>{error}</Text>
-            ) : (
-              <ScrollView style={{ maxHeight: 260 }}>
-                {availableExercises.map((opt) => (
-                  <TouchableOpacity
-                    key={opt._id}
-                    style={styles.exerciseListItem}
-                    onPress={() => addExerciseToSession(opt._id)}
-                  >
-                    <Text style={styles.exerciseListName}>{opt.name}</Text>
-                    <Text style={styles.exerciseListMeta}>
-                      {opt.majorMuscleGroups?.join(", ") || "Muscle group"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        )}
-
         <View style={styles.dayPicker}>
           <TouchableOpacity
             style={styles.dayPickerTrigger}
@@ -509,6 +519,195 @@ export default function Workout() {
             </View>
           )}
         </View>
+
+        <Text style={styles.caption}>
+          {sessionExercises.length}{" "}
+          {sessionExercises.length === 1 ? "exercise" : "exercises"}
+        </Text>
+
+        {sessionExercises.map((ex, exIdx) => {
+          const volume = ex.sets.reduce(
+            (acc, s) => acc + (Number(s.reps) || 0) * (Number(s.weight) || 0),
+            0
+          );
+          return (
+            <View style={styles.card} key={ex.key}>
+              <TouchableOpacity
+                style={[
+                  styles.cardHeader,
+                  ex.completed && {
+                    backgroundColor: "#F4FAF6",
+                    borderRadius: 8,
+                  },
+                ]}
+                onPress={() => toggleExerciseExpanded(ex.key)}
+                activeOpacity={0.8}
+              >
+                <View>
+                  <Text style={styles.cardTitle}>
+                    {ex.name} (Exercise #{exIdx + 1})
+                  </Text>
+                  <Text style={styles.cardMeta}>
+                    {ex.sets.length} sets · {ex.completed ? ex.sets.length : 0}{" "}
+                    completed · {volume} kg
+                  </Text>
+                </View>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  {ex.completed ? (
+                    <Text style={styles.finishedPill}>Finished</Text>
+                  ) : null}
+                  <Ionicons
+                    name={ex.expanded ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color="#111"
+                  />
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => removeExercise(ex.key)}
+                  >
+                    <Ionicons name="trash" size={18} color="#C83737" />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+
+              {ex.expanded ? (
+                <>
+                  <Text style={styles.sectionLabel}>Sets</Text>
+                  {ex.sets.length === 0 ? (
+                    <TouchableOpacity style={styles.emptySet}>
+                      <Text style={styles.emptySetText}>
+                        No sets yet. Add your first set below.
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {ex.sets.map((set, idx) => (
+                    <View key={`${ex.key}-set-${idx}`} style={styles.setRow}>
+                      <Text style={styles.setIndex}>Set #{idx + 1}</Text>
+                      <View style={styles.setInputs}>
+                        <View style={styles.setInputBlock}>
+                          <Text style={styles.setLabel}>Reps</Text>
+                          <TextInput
+                            style={styles.setInput}
+                            keyboardType="numeric"
+                            value={set.reps}
+                            onChangeText={(t) =>
+                              updateSet(ex.key, idx, "reps", t)
+                            }
+                          />
+                        </View>
+                        <View style={styles.setInputBlock}>
+                          <Text style={styles.setLabel}>
+                            Weight ({set.unit})
+                          </Text>
+                          <TextInput
+                            style={styles.setInput}
+                            keyboardType="numeric"
+                            value={set.weight}
+                            onChangeText={(t) =>
+                              updateSet(ex.key, idx, "weight", t)
+                            }
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.setActions}>
+                        <TouchableOpacity
+                          style={styles.unitToggleSmall}
+                          onPress={() =>
+                            updateSet(
+                              ex.key,
+                              idx,
+                              "unit",
+                              set.unit === "kg" ? "lbs" : "kg"
+                            )
+                          }
+                        >
+                          <Text style={styles.unitToggleSmallText}>
+                            {set.unit.toUpperCase()}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.iconBtnSmall}
+                          onPress={() => removeSet(ex.key, idx)}
+                        >
+                          <Ionicons name="trash" size={16} color="#C83737" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+
+                  <TouchableOpacity
+                    style={styles.addSetBtn}
+                    onPress={() => addSet(ex.key)}
+                  >
+                    <Text style={styles.addSetText}>+ Add Set</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.finishExerciseBtn,
+                      ex.completed && { backgroundColor: "#E5F5EC" },
+                    ]}
+                    onPress={() => markExerciseComplete(ex.key)}
+                    disabled={ex.completed}
+                  >
+                    <Text
+                      style={[
+                        styles.finishExerciseText,
+                        ex.completed && { color: "#2FA44F" },
+                      ]}
+                    >
+                      {ex.completed
+                        ? `Exercise #${exIdx + 1} finished`
+                        : `Finish Exercise #${exIdx + 1}`}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </View>
+          );
+        })}
+
+        {showExerciseList && (
+          <View style={styles.exerciseList}>
+            <View style={styles.exerciseListHeader}>
+              <Text style={styles.exerciseListTitle}>Choose exercise</Text>
+              <TouchableOpacity onPress={() => setShowExerciseList(false)}>
+                <Ionicons name="close" size={20} color="#111" />
+              </TouchableOpacity>
+            </View>
+            {loadingExercises ? (
+              <View style={styles.loaderRow}>
+                <ActivityIndicator color="#1E3DF0" />
+                <Text style={styles.loaderText}>Loading...</Text>
+              </View>
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 260 }}>
+                {filteredExercises.length === 0 ? (
+                  <Text style={styles.emptySetText}>
+                    No exercises match this training day.
+                  </Text>
+                ) : null}
+                {filteredExercises.map((opt) => (
+                  <TouchableOpacity
+                    key={opt._id}
+                    style={styles.exerciseListItem}
+                    onPress={() => addExerciseToSession(opt._id)}
+                  >
+                    <Text style={styles.exerciseListName}>{opt.name}</Text>
+                    <Text style={styles.exerciseListMeta}>
+                      {opt.majorMuscleGroups?.join(", ") || "Muscle group"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={styles.primaryBtn}
@@ -602,7 +801,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#E8E8E8",
     shadowColor: "#000",
@@ -615,22 +814,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: "#111",
   },
   cardMeta: {
     marginTop: 2,
-    fontSize: 12,
+    fontSize: 11,
     color: "#777",
   },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "#FDEAEA",
     alignItems: "center",
     justifyContent: "center",
@@ -703,6 +902,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#fff",
   },
+  finishExerciseBtn: {
+    marginTop: 10,
+    backgroundColor: "#1E3DF0",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  finishExerciseText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  finishedPill: {
+    backgroundColor: "#E5F5EC",
+    color: "#2FA44F",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9,
+    fontWeight: "700",
+    fontSize: 11,
+  },
   setActions: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -716,6 +936,29 @@ const styles = StyleSheet.create({
   },
   unitToggleSmallText: {
     color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  gymBanner: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: "#ECF3FF",
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#D1DEFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  gymBannerText: {
+    color: "#1E3DF0",
     fontWeight: "700",
     fontSize: 12,
   },

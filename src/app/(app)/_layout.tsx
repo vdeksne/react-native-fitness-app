@@ -1,3 +1,4 @@
+import "react-native-reanimated";
 import { Stack } from "expo-router";
 import { AuthProvider } from "../../context/AuthContext";
 
