@@ -25,11 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  client,
-  adminClient,
-  config as sanityConfig,
-} from "../../../../sanity/client";
+import { supabaseSafe as supabase } from "../../../lib/supabase";
 
 type Unit = "lbs" | "kg";
 
@@ -65,7 +61,15 @@ const trainingDayOptions = [
 ];
 
 export default function Workout() {
-  const canWrite = adminClient !== client;
+  const supabaseUrl =
+    process.env.EXPO_PUBLIC_SUPABASE_URL ||
+    Constants.expoConfig?.extra?.supabaseUrl ||
+    "";
+  const supabaseAnonKey =
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+    Constants.expoConfig?.extra?.supabaseAnonKey ||
+    "";
+  const canWrite = !!supabaseUrl && !!supabaseAnonKey;
   const [started, setStarted] = useState(false);
   const [unit, setUnit] = useState<Unit>("kg");
   const [startedAt, setStartedAt] = useState<Date | null>(null);
@@ -83,14 +87,6 @@ export default function Workout() {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const dataset = sanityConfig.dataset || "fitness-app";
-  const apiVersion = sanityConfig.apiVersion || "2023-10-12";
-  const readClient = client.withConfig({ dataset, apiVersion });
-  const writeClient = (adminClient || client).withConfig({
-    dataset,
-    apiVersion,
-  });
 
   const pulse = useSharedValue(1);
   const pulseStyle = useAnimatedStyle(() => ({
@@ -139,22 +135,27 @@ export default function Workout() {
     try {
       setLoadingStats(true);
       setStatError(null);
-      const data = await readClient.fetch(
-        `*[_type == "workout"] | order(coalesce(date, _createdAt) desc)[0..9]{
-          _id,
-          date,
-          durationMin,
-          exercises[]{ "name": exercise->name, sets[]{reps, weight, weightUnit} }
-        }`
-      );
-      setWorkouts(Array.isArray(data) ? data : []);
+      const { data, error } = await supabase
+        .from("workouts")
+        .select("id,date,duration_min,exercises")
+        .order("date", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      const mapped =
+        data?.map((w: any) => ({
+          _id: w.id,
+          date: w.date,
+          durationMin: w.duration_min,
+          exercises: w.exercises || [],
+        })) || [];
+      setWorkouts(mapped);
     } catch (e: any) {
       setStatError("Could not load workout stats.");
       setWorkouts([]);
     } finally {
       setLoadingStats(false);
     }
-  }, [readClient]);
+  }, []);
 
   useEffect(() => {
     pulse.value = withRepeat(
@@ -164,7 +165,9 @@ export default function Workout() {
     );
     fetchQuote();
     loadWorkouts();
-  }, [pulse, fetchQuote, loadWorkouts]);
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- FIX for workoutTimer undefined ---
   const [workoutTimer, setWorkoutTimer] = useState(0);
@@ -199,25 +202,33 @@ export default function Workout() {
   const fetchLastSetForExercise = useCallback(
     async (exerciseId: string) => {
       try {
-        const data = await readClient.fetch(
-          `*[_type == "workout" && references($exId)]
-            | order(coalesce(date, _createdAt) desc)[0].exercises[exercise._ref == $exId][0].sets[-1]`,
-          { exId: exerciseId }
-        );
-        const last = data;
-        if (last) {
-          const unitFromLast: Unit = last?.weightUnit === "lbs" ? "lbs" : "kg";
-          return {
-            reps:
-              last?.reps !== undefined && last?.reps !== null
-                ? String(last.reps)
-                : "0",
-            weight:
-              last?.weight !== undefined && last?.weight !== null
-                ? String(last.weight)
-                : "0",
-            unit: unitFromLast || unit,
-          };
+        const { data, error } = await supabase
+          .from("workouts")
+          .select("exercises,date")
+          .order("date", { ascending: false })
+          .limit(10);
+        if (error) throw error;
+        const rows: any[] = Array.isArray(data) ? data : [];
+        for (const row of rows) {
+          const match = (row.exercises || []).find(
+            (ex: any) => ex.exerciseId === exerciseId
+          );
+          if (match?.sets?.length) {
+            const last = match.sets[match.sets.length - 1];
+            const unitFromLast: Unit =
+              last?.weightUnit === "lbs" ? "lbs" : "kg";
+            return {
+              reps:
+                last?.reps !== undefined && last?.reps !== null
+                  ? String(last.reps)
+                  : "0",
+              weight:
+                last?.weight !== undefined && last?.weight !== null
+                  ? String(last.weight)
+                  : "0",
+              unit: unitFromLast || unit,
+            };
+          }
         }
       } catch (e) {
         // ignore and fallback to defaults
@@ -231,10 +242,20 @@ export default function Workout() {
     try {
       setLoadingExercises(true);
       setError(null);
-      const data = await readClient.fetch(
-        `*[_type == "exercise" && isActive != false]{_id, name, majorMuscleGroups, trainingDays}`
-      );
-      const arr: ExerciseOption[] = Array.isArray(data) ? data : [];
+      const { data, error } = await supabase
+        .from("exercises")
+        .select("id,name,major_muscle_groups,training_days,is_active")
+        .or("is_active.is.null,is_active.eq.true")
+        .limit(100);
+      if (error) throw error;
+      const arr: ExerciseOption[] = Array.isArray(data)
+        ? data.map((ex: any) => ({
+            _id: ex.id,
+            name: ex.name,
+            majorMuscleGroups: ex.major_muscle_groups || [],
+            trainingDays: ex.training_days || [],
+          }))
+        : [];
       setAvailableExercises(arr);
     } catch (e: any) {
       setError("Could not load exercises from your database.");
@@ -355,9 +376,13 @@ export default function Workout() {
   const handleComplete = async () => {
     if (!canWrite) {
       Alert.alert(
-        "Sanity write token required",
-        "Set EXPO_PUBLIC_SANITY_TOKEN (write-enabled) and restart the dev server."
+        "Supabase config required",
+        "Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
+      return;
+    }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setError("Supabase is not configured.");
       return;
     }
     if (sessionExercises.length === 0) {
@@ -371,14 +396,14 @@ export default function Workout() {
         : Math.max(1, Math.round(workoutTimer / 60));
 
     const payload = {
-      _type: "workout",
-      userId: "demo-user",
+      user_id: "demo-user",
       date: now.toISOString(),
-      startedAt: startedAt ? startedAt.toISOString() : now.toISOString(),
-      endedAt: now.toISOString(),
-      durationMin,
+      started_at: startedAt ? startedAt.toISOString() : now.toISOString(),
+      ended_at: now.toISOString(),
+      duration_min: durationMin,
       exercises: sessionExercises.map((ex) => ({
-        exercise: { _type: "reference", _ref: ex.exerciseId },
+        exerciseId: ex.exerciseId,
+        name: ex.name,
         sets: ex.sets.map((s) => ({
           reps: Number(s.reps) || 0,
           weight: s.weight ? Number(s.weight) : undefined,
@@ -389,7 +414,11 @@ export default function Workout() {
 
     try {
       setSaving(true);
-      await writeClient.create(payload);
+      const { error } = await supabase.from("workouts").insert([payload]);
+      if (error) {
+        console.warn("[supabase] save workout failed", error);
+        throw error;
+      }
       Alert.alert("Saved", "Workout saved to your history.");
       handleEnd();
     } catch (e: any) {

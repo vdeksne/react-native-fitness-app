@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
-import { client, config as sanityConfig } from "../../../../sanity/client";
+import { supabaseSafe as supabase } from "../../../lib/supabase";
 
 type WorkoutDoc = {
   _id: string;
@@ -27,24 +27,25 @@ export default function Page() {
   const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
   const [viewMode, setViewMode] = useState<"week" | "month" | "year">("month");
 
-  const dataset = sanityConfig.dataset || "fitness-app";
-  const apiVersion = sanityConfig.apiVersion || "2023-10-12";
-  const readClient = client.withConfig({ dataset, apiVersion });
-
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await readClient.fetch(
-          `*[_type == "workout"] | order(coalesce(date, _createdAt) desc)[0..9]{
-            _id,
-            date,
-            durationMin,
-            exercises[]{ "name": exercise->name, sets[]{reps, weight, weightUnit} }
-          }`
-        );
-        setWorkouts(Array.isArray(data) ? data : []);
+        const { data, error } = await supabase
+          .from("workouts")
+          .select("id,date,duration_min,exercises")
+          .order("date", { ascending: false })
+          .limit(10);
+        if (error) throw error;
+        const mapped =
+          data?.map((w: any) => ({
+            _id: w.id,
+            date: w.date,
+            durationMin: w.duration_min,
+            exercises: w.exercises || [],
+          })) || [];
+        setWorkouts(mapped);
       } catch (e: any) {
         setError("Could not load workout stats.");
       } finally {

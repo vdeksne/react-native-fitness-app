@@ -11,7 +11,7 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { client } from "../../../../sanity/client";
+import { supabaseSafe as supabase } from "../../../lib/supabase";
 import { useRouter } from "expo-router";
 import { useAuthContext } from "../../../context/AuthContext";
 
@@ -39,18 +39,21 @@ export default function Profile() {
       try {
         setLoading(true);
         setError(null);
-        const data = await client.fetch(
-          `*[_type == "workout"] | order(date desc) [0..2]{
-            _id,
-            date,
-            durationMin,
-            exercises[]{
-              "name": exercise->name,
-              sets[]{reps, weight, weightUnit}
-            }
-          }`
-        );
-        const arr = Array.isArray(data) ? data : [];
+        const { data, error } = await supabase
+          .from("workouts")
+          .select("id,date,duration_min,exercises")
+          .order("date", { ascending: false })
+          .limit(3);
+        if (error) throw error;
+        const arr =
+          Array.isArray(data) && data.length
+            ? data.map((w: any) => ({
+                _id: w.id,
+                date: w.date,
+                durationMin: w.duration_min,
+                exercises: w.exercises || [],
+              }))
+            : [];
         setWorkouts(arr);
       } catch (e: any) {
         setError("Could not load workout stats.");

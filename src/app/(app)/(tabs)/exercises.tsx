@@ -14,10 +14,10 @@ import {
 } from "react-native";
 import Constants from "expo-constants";
 import ExerciseCard from "../../components/ExerciseCard";
-import { client } from "../../../../sanity/client";
 import { useRouter } from "expo-router";
 // @ts-ignore expo-image-picker types resolved at runtime
 import * as ImagePicker from "expo-image-picker";
+import { supabaseSafe as supabase } from "../../../lib/supabase";
 
 type ApiExercise = {
   exerciseId: string;
@@ -116,38 +116,34 @@ export default function Exercises() {
     Constants.expoConfig?.extra?.exerciseDbHost ||
     "exercisedb-api1.p.rapidapi.com";
 
-  const sanityProjectId =
-    process.env.EXPO_PUBLIC_SANITY_PROJECT_ID ||
-    Constants.expoConfig?.extra?.sanityProjectId ||
+  const supabaseUrl =
+    process.env.EXPO_PUBLIC_SUPABASE_URL ||
+    Constants.expoConfig?.extra?.supabaseUrl ||
     "";
-  const sanityDataset =
-    process.env.EXPO_PUBLIC_SANITY_DATASET ||
-    Constants.expoConfig?.extra?.sanityDataset ||
-    "production";
-  const sanityApiVersion =
-    process.env.EXPO_PUBLIC_SANITY_API_VERSION ||
-    Constants.expoConfig?.extra?.sanityApiVersion ||
-    "2023-10-12";
-  const sanityToken =
-    process.env.EXPO_PUBLIC_SANITY_TOKEN ||
-    Constants.expoConfig?.extra?.sanityToken ||
+  const supabaseAnonKey =
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+    Constants.expoConfig?.extra?.supabaseAnonKey ||
     "";
+  const supabaseBucket =
+    process.env.EXPO_PUBLIC_SUPABASE_BUCKET ||
+    Constants.expoConfig?.extra?.supabaseBucket ||
+    "exercise-images";
 
   const fetchLocalExercises = useCallback(async (q: string) => {
-    // Use Sanity JS client to avoid manual fetch/CORS issues
     if (!q.trim()) return [];
-    const data = await client.fetch(
-      `*[_type == "exercise" && isActive != false && name match $q]{
-        name,
-        description,
-        difficulty,
-        "image": image.asset->url,
-        majorMuscleGroups,
-        trainingDays,
-        videoUrl
-      }`,
-      { q: `${q}*` }
-    );
+    const { data, error } = await supabase
+      .from("exercises")
+      .select(
+        "id,name,description,difficulty,image_url,video_url,major_muscle_groups,training_days,is_active"
+      )
+      .ilike("name", `%${q}%`)
+      .or("is_active.is.null,is_active.eq.true")
+      .limit(50);
+
+    if (error) {
+      console.warn("[supabase] fetchLocalExercises failed", error);
+      return [];
+    }
     const arr: any[] = Array.isArray(data) ? data : [];
     return arr.map(
       (ex): ExerciseItem => ({
@@ -156,10 +152,10 @@ export default function Exercises() {
         description: ex.description || "No description provided.",
         muscle: undefined,
         type: undefined,
-        image: ex.image,
-        majorMuscleGroups: ex.majorMuscleGroups,
-        trainingDays: ex.trainingDays,
-        video: ex.videoUrl,
+        image: ex.image_url || undefined,
+        majorMuscleGroups: ex.major_muscle_groups || [],
+        trainingDays: ex.training_days || [],
+        video: ex.video_url || undefined,
       })
     );
   }, []);
@@ -268,6 +264,36 @@ export default function Exercises() {
   const toggleFromList = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
+  const uploadImageToSupabase = useCallback(
+    async (uri: string): Promise<string | undefined> => {
+      if (!uri) return undefined;
+      try {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        const fileExt = blob.type?.split("/")[1] || "jpg";
+        const path = `exercise-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from(supabaseBucket)
+          .upload(path, blob, {
+            contentType: blob.type || "image/jpeg",
+            upsert: true,
+          });
+        if (uploadError) {
+          console.warn("[supabase] image upload failed", uploadError);
+          return undefined;
+        }
+        const { data: publicData } = supabase.storage
+          .from(supabaseBucket)
+          .getPublicUrl(path);
+        return publicData?.publicUrl;
+      } catch (e) {
+        console.warn("[supabase] image upload threw", e);
+        return undefined;
+      }
+    },
+    [supabaseBucket]
+  );
+
   const addExercise = async () => {
     if (!newName.trim()) {
       Alert.alert("Missing name", "Please enter a name for the exercise.");
@@ -284,54 +310,47 @@ export default function Exercises() {
       Alert.alert("Pick training days", "Select at least one training day.");
       return;
     }
-    if (!sanityToken) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       Alert.alert(
-        "No write token",
-        "Set EXPO_PUBLIC_SANITY_TOKEN to add exercises to the database."
+        "Missing Supabase config",
+        "Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
       );
       return;
     }
     try {
       setSaving(true);
       setError(null);
-      let imageRef: string | undefined;
+      let imageUrl: string | undefined;
       const targetImage = newImageUri.trim() || newImageUrl.trim();
 
       if (targetImage) {
-        try {
-          const res = await fetch(targetImage);
-          const blob = await res.blob();
-          const asset = await client
-            .withConfig({ token: sanityToken, dataset: sanityDataset })
-            .assets.upload("image", blob, {
-              filename: `exercise-${Date.now()}.jpg`,
-            });
-          imageRef = asset?._id;
-        } catch (e) {
-          Alert.alert("Image upload failed", "We could not upload that image.");
+        imageUrl = await uploadImageToSupabase(targetImage);
+        if (!imageUrl) {
+          Alert.alert(
+            "Image upload failed",
+            "We could not upload that image. Please try again."
+          );
         }
       }
 
       const doc: any = {
-        _type: "exercise",
         name: newName.trim(),
         description: newDescription.trim() || "No description provided.",
         difficulty: newDifficulty.trim() || "unknown",
-        majorMuscleGroups: newMuscles,
-        trainingDays: newDays,
-        isActive: newIsActive,
+        major_muscle_groups: newMuscles,
+        training_days: newDays,
+        is_active: newIsActive,
+        image_url: imageUrl,
       };
-      if (newVideoUrl.trim()) doc.videoUrl = newVideoUrl.trim();
-      if (imageRef) {
-        doc.image = {
-          _type: "image",
-          asset: { _type: "reference", _ref: imageRef },
-        };
-      }
+      if (newVideoUrl.trim()) doc.video_url = newVideoUrl.trim();
 
-      await client
-        .withConfig({ token: sanityToken, dataset: sanityDataset })
-        .create(doc);
+      const { error: insertError } = await supabase
+        .from("exercises")
+        .insert([doc]);
+      if (insertError) {
+        console.warn("[supabase] insert exercise failed", insertError);
+        throw insertError;
+      }
 
       Alert.alert("Saved", "Exercise added to your database.", [
         { text: "OK", onPress: () => {} },
@@ -543,7 +562,9 @@ export default function Exercises() {
               <TouchableOpacity
                 style={[
                   styles.addButtonPrimary,
-                  (!sanityToken || saving) && { opacity: 0.5 },
+                  (!supabaseUrl || !supabaseAnonKey || saving) && {
+                    opacity: 0.5,
+                  },
                 ]}
                 onPress={saving ? undefined : addExercise}
               >
