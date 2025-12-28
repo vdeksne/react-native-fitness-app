@@ -18,7 +18,6 @@ import { useRouter } from "expo-router";
 // @ts-ignore expo-image-picker types resolved at runtime
 import * as ImagePicker from "expo-image-picker";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
-
 type ApiExercise = {
   exerciseId: string;
   name: string;
@@ -33,8 +32,8 @@ type ApiExercise = {
 };
 
 export type ExerciseItem = {
+  id?: string;
   name: string;
-  difficulty: string;
   description: string;
   muscle?: string;
   type?: string;
@@ -46,6 +45,7 @@ export type ExerciseItem = {
   video?: string;
   majorMuscleGroups?: string[];
   trainingDays?: string[];
+  // Removed difficulty field wherever declared, as per instruction
 };
 
 const muscleOptions = [
@@ -92,7 +92,6 @@ export default function Exercises() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [newDifficulty, setNewDifficulty] = useState("");
   const [newMuscles, setNewMuscles] = useState<string[]>([]);
   const [newDays, setNewDays] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState("");
@@ -100,6 +99,8 @@ export default function Exercises() {
   const [newVideoUrl, setNewVideoUrl] = useState("");
   const [newIsActive, setNewIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lastDeleted, setLastDeleted] = useState<ExerciseItem | null>(null);
+  // Removed difficulty state, as per instruction (no useState for newDifficulty)
 
   const apiKey =
     process.env.EXPO_PUBLIC_EXERCISEDB_KEY ||
@@ -134,7 +135,7 @@ export default function Exercises() {
     const { data, error } = await supabase
       .from("exercises")
       .select(
-        "id,name,description,difficulty,image_url,video_url,major_muscle_groups,training_days,is_active"
+        "id,name,description,image_url,video_url,major_muscle_groups,training_days,is_active"
       )
       .ilike("name", `%${q}%`)
       .or("is_active.is.null,is_active.eq.true")
@@ -147,8 +148,8 @@ export default function Exercises() {
     const arr: any[] = Array.isArray(data) ? data : [];
     return arr.map(
       (ex): ExerciseItem => ({
+        id: ex.id,
         name: ex.name,
-        difficulty: ex.difficulty || "unknown",
         description: ex.description || "No description provided.",
         muscle: undefined,
         type: undefined,
@@ -199,7 +200,6 @@ export default function Exercises() {
 
         const mapped: ExerciseItem[] = data.map((ex) => ({
           name: ex.name,
-          difficulty: "unknown",
           description: Array.isArray(ex.instructions)
             ? ex.instructions.join(" ")
             : ex.instructions || "No description provided.",
@@ -238,28 +238,139 @@ export default function Exercises() {
     }
   }, [apiKey, baseUrl, fetchLocalExercises, hostHeader, query, source]);
 
+  const deleteExercise = async (item: ExerciseItem) => {
+    if (!item.id) {
+      Alert.alert("Cannot delete", "This exercise has no id.");
+      return;
+    }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      Alert.alert(
+        "Missing Supabase config",
+        "Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    Alert.alert("Delete exercise", `Delete "${item.name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from("exercises")
+              .delete()
+              .eq("id", item.id);
+            if (error) throw error;
+            setItems((prev) => prev.filter((ex) => ex.id !== item.id));
+            setLastDeleted(item);
+          } catch (e: any) {
+            Alert.alert(
+              "Delete failed",
+              e?.message || "Could not delete exercise."
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: ExerciseItem }) => (
-    <TouchableOpacity
-      onPress={() =>
-        router.push({
-          pathname: "exercise-detail",
-          params: {
-            name: item.name,
-            description: item.description,
-            difficulty: item.difficulty,
-            image: item.image || "",
-            video: item.video || "",
-            muscles: (item.majorMuscleGroups || item.targets || []).join(","),
-            days: (item.trainingDays || item.bodyParts || []).join(","),
-            type: item.type || item.muscle || "",
-          },
-        })
-      }
-      activeOpacity={0.8}
-    >
-      <ExerciseCard item={item} />
-    </TouchableOpacity>
+    <View style={styles.cardRow}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={() =>
+          router.push({
+            pathname: "exercise-detail",
+            params: {
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              image: item.image || "",
+              video: item.video || "",
+              muscles: (item.majorMuscleGroups || item.targets || []).join(","),
+              days: (item.trainingDays || item.bodyParts || []).join(","),
+              type: item.type || item.muscle || "",
+              edit: "0",
+            },
+          })
+        }
+        activeOpacity={0.8}
+      >
+        <ExerciseCard item={item} />
+      </TouchableOpacity>
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={styles.editPill}
+          onPress={() =>
+            router.push({
+              pathname: "exercise-detail",
+              params: {
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                image: item.image || "",
+                video: item.video || "",
+                muscles: (item.majorMuscleGroups || item.targets || []).join(
+                  ","
+                ),
+                days: (item.trainingDays || item.bodyParts || []).join(","),
+                type: item.type || item.muscle || "",
+                edit: "1",
+              },
+            })
+          }
+          disabled={!item.id}
+        >
+          <Text style={styles.editPillText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deletePill}
+          onPress={() => deleteExercise(item)}
+          disabled={!item.id}
+        >
+          <Text style={styles.deletePillText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
+
+  const undoDelete = async () => {
+    if (!lastDeleted) return;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      Alert.alert(
+        "Missing Supabase config",
+        "Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    try {
+      setSaving(true);
+      const doc: any = {
+        id: lastDeleted.id,
+        name: lastDeleted.name,
+        description: lastDeleted.description || "No description provided.",
+        major_muscle_groups: lastDeleted.majorMuscleGroups || [],
+        training_days: lastDeleted.trainingDays || [],
+        is_active: true,
+      };
+      if (lastDeleted.image) doc.image_url = lastDeleted.image;
+      if (lastDeleted.video) doc.video_url = lastDeleted.video;
+
+      const { error } = await supabase.from("exercises").insert([doc]);
+      if (error) throw error;
+      setItems((prev) => [lastDeleted, ...prev]);
+      setLastDeleted(null);
+      Alert.alert("Restored", `"${lastDeleted.name}" was restored.`);
+    } catch (e: any) {
+      Alert.alert(
+        "Restore failed",
+        e?.message || "Could not restore exercise."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleFromList = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -269,10 +380,18 @@ export default function Exercises() {
       if (!uri) return undefined;
       try {
         const res = await fetch(uri);
+        if (!res.ok) {
+          const msg = await res.text().catch(() => "");
+          Alert.alert(
+            "Upload failed",
+            `Could not read file (${res.status}). ${msg || ""}`
+          );
+          return undefined;
+        }
         const blob = await res.blob();
-        const fileExt = blob.type?.split("/")[1] || "jpg";
-        const path = `exercise-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
+        const ext = blob.type?.split("/")[1] || "jpg";
+        const path = `exercise-${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from(supabaseBucket)
           .upload(path, blob, {
             contentType: blob.type || "image/jpeg",
@@ -280,14 +399,21 @@ export default function Exercises() {
           });
         if (uploadError) {
           console.warn("[supabase] image upload failed", uploadError);
+          Alert.alert("Upload failed", uploadError.message || "Storage error");
           return undefined;
         }
+
         const { data: publicData } = supabase.storage
           .from(supabaseBucket)
           .getPublicUrl(path);
-        return publicData?.publicUrl;
+        if (!publicData?.publicUrl) {
+          Alert.alert("Upload failed", "Could not get public URL");
+          return undefined;
+        }
+        return publicData.publicUrl;
       } catch (e) {
         console.warn("[supabase] image upload threw", e);
+        Alert.alert("Upload failed", "Unexpected error uploading image.");
         return undefined;
       }
     },
@@ -325,18 +451,13 @@ export default function Exercises() {
 
       if (targetImage) {
         imageUrl = await uploadImageToSupabase(targetImage);
-        if (!imageUrl) {
-          Alert.alert(
-            "Image upload failed",
-            "We could not upload that image. Please try again."
-          );
-        }
+        if (!imageUrl) return;
       }
 
       const doc: any = {
         name: newName.trim(),
         description: newDescription.trim() || "No description provided.",
-        difficulty: newDifficulty.trim() || "unknown",
+        // Remove 'difficulty' field: difficulty: newDifficulty.trim() || "unknown",
         major_muscle_groups: newMuscles,
         training_days: newDays,
         is_active: newIsActive,
@@ -357,7 +478,6 @@ export default function Exercises() {
       ]);
       setNewName("");
       setNewDescription("");
-      setNewDifficulty("");
       setNewMuscles([]);
       setNewDays([]);
       setNewImageUrl("");
@@ -378,13 +498,18 @@ export default function Exercises() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 140 }}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>Exercises</Text>
 
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
           placeholder="Search by name or muscle (e.g., biceps, chest, curl...)"
+          placeholderTextColor="#111"
           value={query}
           onChangeText={setQuery}
           returnKeyType="search"
@@ -415,34 +540,41 @@ export default function Exercises() {
           </TouchableOpacity>
         ) : (
           <ScrollView
-            style={{ maxHeight: 420 }}
-            contentContainerStyle={{ paddingBottom: 8 }}
+            contentContainerStyle={{ paddingBottom: 16 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.addTitle}>New Exercise</Text>
             <TextInput
               style={styles.input}
               placeholder="Name"
+              placeholderTextColor="#111"
               value={newName}
               onChangeText={setNewName}
             />
             <TextInput
               style={[styles.input, styles.multiline]}
               placeholder="Description"
+              placeholderTextColor="#111"
               value={newDescription}
               onChangeText={setNewDescription}
               multiline
             />
+            {/* Removed Difficulty input field */}
+            {/* 
             <TextInput
               style={styles.input}
               placeholder="Difficulty (optional)"
-              value={newDifficulty}
-              onChangeText={setNewDifficulty}
+              value=""
+              editable={false}
             />
+            */}
 
             <TextInput
               style={styles.input}
               placeholder="Image URL (optional)"
+              placeholderTextColor="#111"
               value={newImageUrl}
               onChangeText={setNewImageUrl}
               autoCapitalize="none"
@@ -460,8 +592,12 @@ export default function Exercises() {
                   return;
                 }
                 const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  // Use new MediaType enum when available; fall back for older types.
+                  mediaTypes:
+                    (ImagePicker as any).MediaType?.IMAGES ??
+                    ImagePicker.MediaTypeOptions.Images,
                   quality: 0.8,
+                  copyToCacheDirectory: true,
                 });
                 if (!result.canceled && result.assets?.length) {
                   setNewImageUri(result.assets[0].uri);
@@ -470,6 +606,31 @@ export default function Exercises() {
               }}
             >
               <Text style={styles.pickButtonText}>Pick image from device</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pickButton}
+              onPress={async () => {
+                const perm = await ImagePicker.requestCameraPermissionsAsync();
+                if (perm.status !== "granted") {
+                  Alert.alert(
+                    "Permission needed",
+                    "Please allow camera access to take a photo."
+                  );
+                  return;
+                }
+                const result = await ImagePicker.launchCameraAsync({
+                  mediaTypes:
+                    (ImagePicker as any).MediaType?.IMAGES ??
+                    ImagePicker.MediaTypeOptions.Images,
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets?.length) {
+                  setNewImageUri(result.assets[0].uri);
+                  setNewImageUrl("");
+                }
+              }}
+            >
+              <Text style={styles.pickButtonText}>Take photo</Text>
             </TouchableOpacity>
             {newImageUrl.trim() ? (
               <Image
@@ -540,6 +701,7 @@ export default function Exercises() {
             <TextInput
               style={styles.input}
               placeholder="Video URL (optional)"
+              placeholderTextColor="#111"
               value={newVideoUrl}
               onChangeText={setNewVideoUrl}
             />
@@ -578,7 +740,7 @@ export default function Exercises() {
                   setShowAddForm(false);
                   setNewName("");
                   setNewDescription("");
-                  setNewDifficulty("");
+                  // setNewDifficulty(""); // removed, since no longer needed
                   setNewMuscles([]);
                   setNewDays([]);
                   setNewVideoUrl("");
@@ -603,19 +765,84 @@ export default function Exercises() {
         data={items}
         keyExtractor={(item, idx) => `${item.name}-${idx}`}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        scrollEnabled={false}
         ListEmptyComponent={
           !loading && !error ? (
             <Text style={styles.empty}>No exercises found.</Text>
           ) : null
         }
       />
-    </View>
+      {lastDeleted ? (
+        <View style={[styles.undoBar, { marginTop: 12, marginBottom: 8 }]}>
+          <Text style={styles.undoText}>
+            Deleted "{lastDeleted.name}". Undo?
+          </Text>
+          <TouchableOpacity
+            style={[styles.undoBtn, saving && { opacity: 0.6 }]}
+            onPress={undoDelete}
+            disabled={saving}
+          >
+            <Text style={styles.undoBtnText}>Undo</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#F5F5F5" },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  cardActions: {
+    flexDirection: "column",
+    gap: 6,
+  },
+  editPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#222",
+    borderRadius: 10,
+  },
+  editPillText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  deletePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#222",
+    borderRadius: 10,
+  },
+  deletePillText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  undoBar: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#111",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  undoText: {
+    color: "#fff",
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  undoBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+  },
+  undoBtnText: {
+    color: "#111",
+    fontWeight: "800",
+    fontSize: 13,
+  },
   title: { fontSize: 22, fontWeight: "800", marginBottom: 12, color: "#111" },
   searchRow: { marginBottom: 12 },
   toggleRow: { flexDirection: "row", gap: 8, marginBottom: 12 },

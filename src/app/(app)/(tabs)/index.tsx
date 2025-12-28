@@ -70,7 +70,9 @@ export default function Page() {
       (acc, w) => acc + (w.durationMin || 0),
       0
     );
-    const avgMinutes = totalWorkouts ? Math.round(totalMinutes / totalWorkouts) : 0;
+    const avgMinutes = totalWorkouts
+      ? Math.round(totalMinutes / totalWorkouts)
+      : 0;
 
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -92,7 +94,13 @@ export default function Page() {
       }
     });
 
-    return { totalWorkouts, totalMinutes, avgMinutes, weeklySets, weeklyVolumeKg };
+    return {
+      totalWorkouts,
+      totalMinutes,
+      avgMinutes,
+      weeklySets,
+      weeklyVolumeKg,
+    };
   }, [workouts]);
 
   const lastWorkouts = useMemo(() => {
@@ -157,8 +165,12 @@ export default function Page() {
     const start = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const leadingEmpty = start.getDay(); // 0 = Sunday
-    const days: { key: string; label: string; isToday: boolean; hasWorkout: boolean }[] =
-      [];
+    const days: {
+      key: string;
+      label: string;
+      isToday: boolean;
+      hasWorkout: boolean;
+    }[] = [];
 
     for (let i = 0; i < leadingEmpty; i++) {
       days.push({
@@ -187,8 +199,12 @@ export default function Page() {
     const now = new Date();
     const start = new Date(now);
     start.setDate(now.getDate() - now.getDay()); // Sunday start
-    const days: { key: string; label: string; isToday: boolean; hasWorkout: boolean }[] =
-      [];
+    const days: {
+      key: string;
+      label: string;
+      isToday: boolean;
+      hasWorkout: boolean;
+    }[] = [];
     for (let i = 0; i < 7; i++) {
       const current = new Date(start);
       current.setDate(start.getDate() + i);
@@ -196,7 +212,10 @@ export default function Page() {
       const hasWorkout = workoutDateSet.has(current.toDateString());
       days.push({
         key: `week-${i}`,
-        label: current.toLocaleDateString(undefined, { weekday: "short", day: "numeric" }),
+        label: current.toLocaleDateString(undefined, {
+          weekday: "short",
+          day: "numeric",
+        }),
         isToday,
         hasWorkout,
       });
@@ -218,7 +237,9 @@ export default function Page() {
     });
     return counts.map((count, idx) => ({
       key: `month-${idx}`,
-      label: new Date(year, idx, 1).toLocaleDateString(undefined, { month: "short" }),
+      label: new Date(year, idx, 1).toLocaleDateString(undefined, {
+        month: "short",
+      }),
       count,
     }));
   }, [workouts]);
@@ -261,7 +282,6 @@ export default function Page() {
             <View style={[styles.card, styles.cardSmall]}>
               <Text style={styles.cardLabel}>Average Duration</Text>
               <Text style={styles.cardValue}>{stats.avgMinutes} min</Text>
-              <View style={styles.placeholderChart} />
             </View>
             <View style={[styles.card, styles.cardSmall]}>
               <Text style={styles.cardLabel}>Total Time</Text>
@@ -313,9 +333,7 @@ export default function Page() {
           </View>
           <View style={styles.calendarHeader}>
             <Text style={styles.calendarMonth}>{calendarMonthLabel}</Text>
-            <Text style={styles.calendarLegend}>
-              ● Workout | ○ Today
-            </Text>
+            <Text style={styles.calendarLegend}>● Workout | ○ Today</Text>
           </View>
           {viewMode === "week" && (
             <View style={styles.weekGrid}>
@@ -332,7 +350,8 @@ export default function Page() {
                     <Text
                       style={[
                         styles.calendarDayText,
-                        (day.hasWorkout || day.isToday) && styles.calendarDayTextActive,
+                        (day.hasWorkout || day.isToday) &&
+                          styles.calendarDayTextActive,
                       ]}
                     >
                       {day.label.split(" ")[1]}
@@ -366,7 +385,8 @@ export default function Page() {
                         <Text
                           style={[
                             styles.calendarDayText,
-                            (day.hasWorkout || day.isToday) && styles.calendarDayTextActive,
+                            (day.hasWorkout || day.isToday) &&
+                              styles.calendarDayTextActive,
                           ]}
                         >
                           {day.label}

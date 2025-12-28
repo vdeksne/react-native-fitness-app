@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
@@ -24,6 +25,7 @@ export default function History() {
   const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -53,6 +55,43 @@ export default function History() {
     };
     load();
   }, []);
+
+  const deleteWorkout = async (id: string) => {
+    Alert.alert("Delete workout", "Remove this workout from history?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          setWorkouts((prev) => prev.filter((w) => w._id !== id));
+          try {
+            await supabase.from("workouts").delete().eq("id", id);
+          } catch {
+            // ignore for now
+          }
+        },
+      },
+    ]);
+  };
+
+  const clearWorkouts = () => {
+    if (!workouts.length) return;
+    Alert.alert("Clear history", "Remove all workouts from history?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: () => {
+          setSaving(true);
+          supabase
+            .from("workouts")
+            .delete()
+            .then(() => setWorkouts([]))
+            .finally(() => setSaving(false));
+        },
+      },
+    ]);
+  };
 
   const latest = workouts[0];
 
@@ -108,7 +147,20 @@ export default function History() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Latest Workout</Text>
+          <View style={styles.summaryHeaderRow}>
+            <Text style={styles.summaryTitle}>Latest Workout</Text>
+            {workouts.length ? (
+              <TouchableOpacity
+                style={[styles.clearBtn, saving && { opacity: 0.6 }]}
+                onPress={clearWorkouts}
+                disabled={saving}
+              >
+                <Text style={styles.clearBtnText}>
+                  {saving ? "Clearing..." : "Clear"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {loading ? (
             <View style={styles.loaderRow}>
@@ -153,6 +205,12 @@ export default function History() {
               <Text style={styles.workoutDate}>
                 {w.date ? new Date(w.date).toLocaleString() : "Unknown date"}
               </Text>
+              <TouchableOpacity
+                style={styles.deletePill}
+                onPress={() => deleteWorkout(w._id)}
+              >
+                <Text style={styles.deletePillText}>Delete</Text>
+              </TouchableOpacity>
               {w.exercises.map((ex, idx) => (
                 <ExerciseCard
                   key={`${w._id}-${idx}`}
@@ -219,21 +277,22 @@ function ExerciseCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: "#fff",
   },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#ECECEC",
+    borderBottomColor: "#e0e0e0",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   link: {
-    color: "#1E3DF0",
+    color: "#111",
     fontSize: 14,
+    fontWeight: "700",
   },
   headerTitle: {
     fontSize: 16,
@@ -245,18 +304,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#e0e0e0",
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
+    shadowColor: "transparent",
   },
   summaryTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: "#111",
     marginBottom: 10,
+  },
+  summaryHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
   summaryRow: {
     flexDirection: "row",
@@ -266,7 +328,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 13,
-    color: "#555",
+    color: "#444",
   },
   loaderRow: {
     flexDirection: "row",
@@ -279,8 +341,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   errorText: {
-    color: "#C83737",
+    color: "#222",
     fontSize: 13,
+  },
+  clearBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
+  },
+  clearBtnText: {
+    color: "#C83737",
+    fontWeight: "800",
+    fontSize: 12,
   },
   deleteBtn: {
     marginTop: 8,
@@ -297,12 +372,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: "center",
-    color: "#666",
+    color: "#444",
     marginTop: 12,
   },
   workoutDate: {
     fontSize: 13,
-    color: "#555",
+    color: "#444",
     marginBottom: 8,
     marginLeft: 4,
   },
@@ -311,12 +386,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#e0e0e0",
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
+    shadowColor: "transparent",
   },
   exerciseHeader: {
     flexDirection: "row",
@@ -332,30 +404,30 @@ const styles = StyleSheet.create({
   exerciseMeta: {
     marginTop: 2,
     fontSize: 12,
-    color: "#777",
+    color: "#555",
   },
   badge: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#f0f0f0",
     alignItems: "center",
     justifyContent: "center",
   },
   badgeText: {
-    color: "#1E3DF0",
+    color: "#111",
     fontWeight: "700",
     fontSize: 12,
   },
   sectionLabel: {
     fontSize: 12,
-    color: "#777",
+    color: "#555",
     marginBottom: 6,
   },
   setRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F6F8FB",
+    backgroundColor: "#f6f6f6",
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -365,8 +437,8 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#E1E8F7",
-    color: "#1E3DF0",
+    backgroundColor: "#e6e6e6",
+    color: "#111",
     fontWeight: "700",
     fontSize: 12,
     textAlign: "center",
@@ -375,7 +447,7 @@ const styles = StyleSheet.create({
   },
   setLabel: {
     fontSize: 13,
-    color: "#444",
+    color: "#222",
   },
   setWeight: {
     fontSize: 13,
@@ -385,11 +457,26 @@ const styles = StyleSheet.create({
   volumeLabel: {
     marginTop: 8,
     fontSize: 12,
-    color: "#777",
+    color: "#555",
   },
   volumeValue: {
     fontSize: 13,
     fontWeight: "700",
     color: "#111",
+  },
+  deletePill: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
+    marginBottom: 8,
+  },
+  deletePillText: {
+    color: "#C83737",
+    fontWeight: "800",
+    fontSize: 12,
   },
 });

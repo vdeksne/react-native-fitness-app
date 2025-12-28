@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
 import { useRouter } from "expo-router";
 import { useAuthContext } from "../../../context/AuthContext";
+import * as SecureStore from "expo-secure-store";
 
 const dayLabels = ["5", "6", "7", "Now, July 8", "9", "10", "11"];
 
@@ -33,6 +34,83 @@ export default function Profile() {
       }[];
     }[]
   >([]);
+  const [weightKg, setWeightKg] = useState("62");
+  const [chestCm, setChestCm] = useState("90");
+  const [waistCm, setWaistCm] = useState("70");
+  const [hipsCm, setHipsCm] = useState("96");
+  const [thighCm, setThighCm] = useState("54");
+  const [armCm, setArmCm] = useState("29");
+  const [calfCm, setCalfCm] = useState("34");
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [savingMeasure, setSavingMeasure] = useState(false);
+  const [measureHistory, setMeasureHistory] = useState<
+    {
+      id: string;
+      label: string;
+      weight: string;
+      chest: string;
+      waist: string;
+      hips: string;
+      thigh: string;
+      arm: string;
+      calf: string;
+    }[]
+  >([]);
+  const MEASURE_KEY = "profile_measurements_v1";
+  const userId = email || "demo-user";
+  const measureUserColumn =
+    process.env.EXPO_PUBLIC_MEASURE_USER_COL ||
+    (Constants.expoConfig?.extra as any)?.measureUserCol ||
+    "user_ref";
+  const userCol =
+    measureUserColumn && measureUserColumn.toLowerCase() === "userid"
+      ? "user_ref"
+      : measureUserColumn;
+  const GOAL_KEY = "profile_goal_v1";
+  const [goalWeight, setGoalWeight] = useState<string>("");
+  const [goalChest, setGoalChest] = useState<string>("");
+  const [goalWaist, setGoalWaist] = useState<string>("");
+  const [goalHips, setGoalHips] = useState<string>("");
+  const [goalThigh, setGoalThigh] = useState<string>("");
+  const [goalArm, setGoalArm] = useState<string>("");
+  const [goalCalf, setGoalCalf] = useState<string>("");
+  const [goalSavedAt, setGoalSavedAt] = useState<string | null>(null);
+  const canSyncMeasurements =
+    !!(
+      process.env.EXPO_PUBLIC_SUPABASE_URL ||
+      Constants.expoConfig?.extra?.supabaseUrl
+    ) &&
+    !!(
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+      Constants.expoConfig?.extra?.supabaseAnonKey
+    );
+  const summary = useMemo(() => {
+    if (measureHistory.length < 2) return null;
+    const newest = measureHistory[0];
+    const oldest = measureHistory[measureHistory.length - 1];
+
+    const makeDelta = (latest: string, first: string, unit: string) => {
+      const diff = Number(latest || 0) - Number(first || 0);
+      const sign = diff > 0 ? "↑" : diff < 0 ? "↓" : "—";
+      const formatted = `${sign} ${Math.abs(diff).toFixed(1)} ${unit}`;
+      const tone: "up" | "down" | "flat" =
+        diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+      return { formatted, tone };
+    };
+
+    return {
+      weight: makeDelta(newest.weight, oldest.weight, "kg"),
+      chest: makeDelta(newest.chest, oldest.chest, "cm"),
+      waist: makeDelta(newest.waist, oldest.waist, "cm"),
+      hips: makeDelta(newest.hips, oldest.hips, "cm"),
+      thigh: makeDelta(newest.thigh, oldest.thigh, "cm"),
+      arm: makeDelta(newest.arm, oldest.arm, "cm"),
+      calf: makeDelta(newest.calf, oldest.calf, "cm"),
+      from: oldest.label,
+      to: newest.label,
+    };
+  }, [measureHistory]);
 
   useEffect(() => {
     const load = async () => {
@@ -147,6 +225,413 @@ export default function Profile() {
         resolve();
       }, 600);
     });
+
+  const persistMeasurements = async (
+    nextHistory: typeof measureHistory,
+    opts?: { lastSavedAt?: string }
+  ) => {
+    try {
+      const payload = {
+        weightKg,
+        chestCm,
+        waistCm,
+        hipsCm,
+        thighCm,
+        armCm,
+        calfCm,
+        lastSaved: opts?.lastSavedAt ?? lastSaved,
+        history: nextHistory,
+      };
+      await SecureStore.setItemAsync(MEASURE_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore persistence failures
+    }
+  };
+
+  const persistGoal = async (savedAt?: string) => {
+    try {
+      const payload = {
+        goalWeight,
+        goalChest,
+        goalWaist,
+        goalHips,
+        goalThigh,
+        goalArm,
+        goalCalf,
+        goalSavedAt: savedAt ?? goalSavedAt,
+      };
+      await SecureStore.setItemAsync(GOAL_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadRemoteMeasurements = async () => {
+    if (!canSyncMeasurements) return false;
+    try {
+      const { data, error } = await supabase
+        .from("measurements")
+        .select(
+          "id,taken_at,weight_kg,chest_cm,waist_cm,hips_cm,thigh_cm,arm_cm,calf_cm"
+        )
+        .eq(userCol, userId)
+        .order("taken_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      const rows: any[] = Array.isArray(data) ? data : [];
+      const mapped = rows.map((r) => ({
+        id: r.id,
+        label: r.taken_at
+          ? new Date(r.taken_at).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Entry",
+        weight: r.weight_kg?.toString() || "",
+        chest: r.chest_cm?.toString() || "",
+        waist: r.waist_cm?.toString() || "",
+        hips: r.hips_cm?.toString() || "",
+        thigh: r.thigh_cm?.toString() || "",
+        arm: r.arm_cm?.toString() || "",
+        calf: r.calf_cm?.toString() || "",
+      }));
+      if (mapped.length) {
+        setMeasureHistory(mapped);
+        setLastSaved(
+          rows[0]?.taken_at
+            ? new Date(rows[0].taken_at).toLocaleString()
+            : null
+        );
+        const newest = mapped[0];
+        setWeightKg(newest.weight || weightKg);
+        setChestCm(newest.chest || chestCm);
+        setWaistCm(newest.waist || waistCm);
+        setHipsCm(newest.hips || hipsCm);
+        setThighCm(newest.thigh || thighCm);
+        setArmCm(newest.arm || armCm);
+        setCalfCm(newest.calf || calfCm);
+        persistMeasurements(mapped, {
+          lastSavedAt: rows[0]?.taken_at
+            ? new Date(rows[0].taken_at).toLocaleString()
+            : undefined,
+        });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const loadSaved = async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(MEASURE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          setWeightKg(parsed.weightKg || "62");
+          setChestCm(parsed.chestCm || "90");
+          setWaistCm(parsed.waistCm || "70");
+          setHipsCm(parsed.hipsCm || "96");
+          setThighCm(parsed.thighCm || "54");
+          setArmCm(parsed.armCm || "29");
+          setCalfCm(parsed.calfCm || "34");
+          if (Array.isArray(parsed.history)) setMeasureHistory(parsed.history);
+          if (parsed.lastSaved) setLastSaved(parsed.lastSaved);
+        }
+      } catch {
+        // ignore load errors
+      }
+    };
+    const loadGoal = async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(GOAL_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          setGoalWeight(parsed.goalWeight || "");
+          setGoalChest(parsed.goalChest || "");
+          setGoalWaist(parsed.goalWaist || "");
+          setGoalHips(parsed.goalHips || "");
+          setGoalThigh(parsed.goalThigh || "");
+          setGoalArm(parsed.goalArm || "");
+          setGoalCalf(parsed.goalCalf || "");
+          setGoalSavedAt(parsed.goalSavedAt || null);
+        }
+      } catch {
+        // ignore goal load errors
+      }
+    };
+    const loadRemoteGoal = async () => {
+      if (!canSyncMeasurements) return false;
+      try {
+        const { data, error } = await supabase
+          .from("goals")
+          .select(
+            "goal_weight,goal_chest,goal_waist,goal_hips,goal_thigh,goal_arm,goal_calf"
+          )
+          .eq(userCol, userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          setGoalWeight(data.goal_weight?.toString() || "");
+          setGoalChest(data.goal_chest?.toString() || "");
+          setGoalWaist(data.goal_waist?.toString() || "");
+          setGoalHips(data.goal_hips?.toString() || "");
+          setGoalThigh(data.goal_thigh?.toString() || "");
+          setGoalArm(data.goal_arm?.toString() || "");
+          setGoalCalf(data.goal_calf?.toString() || "");
+          const stamp = new Date().toLocaleString();
+          setGoalSavedAt(stamp);
+          await persistGoal(stamp);
+          return true;
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    };
+    const loadAll = async () => {
+      const remoteOk = await loadRemoteMeasurements();
+      if (!remoteOk) {
+        await loadSaved();
+      }
+      const goalRemoteOk = await loadRemoteGoal();
+      if (!goalRemoteOk) {
+        await loadGoal();
+      }
+    };
+    loadAll();
+  }, []);
+
+  const saveMeasurements = async () => {
+    const fields = [
+      weightKg,
+      chestCm,
+      waistCm,
+      hipsCm,
+      thighCm,
+      armCm,
+      calfCm,
+    ];
+    const anyInvalid = fields.some(
+      (v) => v.trim() !== "" && Number.isNaN(Number(v.trim()))
+    );
+    if (anyInvalid) {
+      Alert.alert("Invalid number", "Please enter numbers only (use . for decimals).");
+      return;
+    }
+    const now = new Date();
+    const stamp = now.toLocaleString();
+    setLastSaved(stamp);
+    let entry = {
+      id: editingEntryId || `${now.getTime()}`,
+      label: now.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      weight: weightKg,
+      chest: chestCm,
+      waist: waistCm,
+      hips: hipsCm,
+      thigh: thighCm,
+      arm: armCm,
+      calf: calfCm,
+    };
+
+    setSavingMeasure(true);
+    try {
+      if (canSyncMeasurements) {
+        const payload: any = {
+          [userCol]: userId,
+          taken_at: new Date().toISOString(),
+          weight_kg: weightKg.trim() ? Number(weightKg) : null,
+          chest_cm: chestCm.trim() ? Number(chestCm) : null,
+          waist_cm: waistCm.trim() ? Number(waistCm) : null,
+          hips_cm: hipsCm.trim() ? Number(hipsCm) : null,
+          thigh_cm: thighCm.trim() ? Number(thighCm) : null,
+          arm_cm: armCm.trim() ? Number(armCm) : null,
+          calf_cm: calfCm.trim() ? Number(calfCm) : null,
+        };
+        if (editingEntryId) {
+          const { error } = await supabase
+            .from("measurements")
+            .update(payload)
+            .eq("id", editingEntryId)
+              .eq(userCol, userId);
+          if (error) throw error;
+        } else {
+          const { data, error } = await supabase
+            .from("measurements")
+            .insert([payload])
+            .select()
+            .single();
+          if (error) throw error;
+          if (data?.id) {
+            entry = {
+              ...entry,
+              id: data.id,
+              label: data.taken_at
+                ? new Date(data.taken_at).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : entry.label,
+            };
+          }
+        }
+      }
+
+      setMeasureHistory((prev) => {
+        const next = editingEntryId
+          ? prev.map((p) => (p.id === editingEntryId ? entry : p))
+          : [entry, ...prev];
+        const trimmed = next.slice(0, 20);
+        persistMeasurements(trimmed, { lastSavedAt: stamp });
+        return trimmed;
+      });
+      setEditingEntryId(null);
+      Alert.alert("Saved", "Measurements updated.", [{ text: "OK" }]);
+    } catch (e: any) {
+      Alert.alert("Save failed", e?.message || "Could not save measurements.");
+    } finally {
+      setSavingMeasure(false);
+    }
+  };
+
+  const handleEditHistory = (entryId: string) => {
+    const entry = measureHistory.find((m) => m.id === entryId);
+    if (!entry) return;
+    setWeightKg(entry.weight);
+    setChestCm(entry.chest);
+    setWaistCm(entry.waist);
+    setHipsCm(entry.hips);
+    setThighCm(entry.thigh);
+    setArmCm(entry.arm);
+    setCalfCm(entry.calf);
+    setEditingEntryId(entry.id);
+  };
+
+  const handleDeleteHistory = (entryId: string) => {
+    Alert.alert("Delete entry", "Remove this measurement entry?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          if (canSyncMeasurements) {
+            try {
+              await supabase
+                .from("measurements")
+                .delete()
+                .eq("id", entryId)
+                .eq(userCol, userId);
+            } catch (e: any) {
+              Alert.alert(
+                "Delete failed",
+                e?.message || "Could not delete entry in cloud."
+              );
+            }
+          }
+          setMeasureHistory((prev) => {
+            const next = prev.filter((m) => m.id !== entryId);
+            persistMeasurements(next);
+            return next;
+          });
+        },
+      },
+    ]);
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert("Clear history", "Remove all saved measurements?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: async () => {
+          if (canSyncMeasurements) {
+            try {
+              await supabase.from("measurements").delete().eq(userCol, userId);
+            } catch (e: any) {
+              Alert.alert(
+                "Clear failed",
+                e?.message || "Could not clear history in cloud."
+              );
+            }
+          }
+          setMeasureHistory([]);
+          persistMeasurements([]);
+        },
+      },
+    ]);
+  };
+
+  const saveGoal = async () => {
+    const goalFields = [
+      goalWeight,
+      goalChest,
+      goalWaist,
+      goalHips,
+      goalThigh,
+      goalArm,
+      goalCalf,
+    ];
+    const anyInvalid = goalFields.some(
+      (v) => v.trim() !== "" && Number.isNaN(Number(v.trim()))
+    );
+    if (anyInvalid) {
+      Alert.alert("Invalid number", "Goal values must be numbers (use . for decimals).");
+      return;
+    }
+    const stamp = new Date().toLocaleString();
+    if (canSyncMeasurements) {
+      try {
+        const payload: any = {
+          [userCol]: userId,
+          goal_weight: goalWeight.trim() ? Number(goalWeight) : null,
+          goal_chest: goalChest.trim() ? Number(goalChest) : null,
+          goal_waist: goalWaist.trim() ? Number(goalWaist) : null,
+          goal_hips: goalHips.trim() ? Number(goalHips) : null,
+          goal_thigh: goalThigh.trim() ? Number(goalThigh) : null,
+          goal_arm: goalArm.trim() ? Number(goalArm) : null,
+          goal_calf: goalCalf.trim() ? Number(goalCalf) : null,
+        };
+
+        const { data: existing, error: fetchErr } = await supabase
+          .from("goals")
+          .select("id")
+          .eq(userCol, userId)
+          .limit(1)
+          .maybeSingle();
+        if (fetchErr) throw fetchErr;
+
+        if (existing?.id) {
+          const { error: updErr } = await supabase
+            .from("goals")
+            .update(payload)
+            .eq("id", existing.id);
+          if (updErr) throw updErr;
+        } else {
+          const { error: insErr } = await supabase.from("goals").insert([payload]);
+          if (insErr) throw insErr;
+        }
+      } catch (e: any) {
+        Alert.alert("Save failed", e?.message || "Could not save goal to cloud.");
+      }
+    }
+    setGoalSavedAt(stamp);
+    await persistGoal(stamp);
+    Alert.alert("Saved", "Goal updated.", [{ text: "OK" }]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -357,6 +842,96 @@ export default function Profile() {
         </View>
         <Text style={styles.name}>Viktorija Deksne</Text>
 
+        {/* Goal setting */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Goal</Text>
+          <Text style={styles.sectionSub}>
+            {goalSavedAt ? `Last saved: ${goalSavedAt}` : "Set ideal measurements to keep on track"}
+          </Text>
+        </View>
+        <View style={styles.goalCard}>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Goal weight (kg)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalWeight}
+              onChangeText={setGoalWeight}
+              placeholder="e.g. 58"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Chest (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalChest}
+              onChangeText={setGoalChest}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Waist (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalWaist}
+              onChangeText={setGoalWaist}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Hips (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalHips}
+              onChangeText={setGoalHips}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Thigh (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalThigh}
+              onChangeText={setGoalThigh}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Upper Arm (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalArm}
+              onChangeText={setGoalArm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Calf (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={goalCalf}
+              onChangeText={setGoalCalf}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <TouchableOpacity style={styles.primaryAction} onPress={saveGoal}>
+            <Text style={styles.primaryActionText}>Save goal</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Stats summary */}
         <View style={styles.metricsRow}>
           <View style={styles.metric}>
@@ -384,25 +959,238 @@ export default function Profile() {
           </View>
         </View>
 
-        {/* Latest workouts */}
-        {loading ? (
-          <Text style={styles.loadingText}>Loading workouts…</Text>
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : cards.length === 0 ? (
-          <Text style={styles.emptyText}>No workouts yet.</Text>
-        ) : (
-          cards.map((c, idx) => (
-            <ActivityCard
-              key={c.key}
-              color={idx === 0 ? "#FDE9EA" : "#E7E7E7"}
-              icon="run"
-              title={c.title}
-              subtitle={c.dateLabel}
-              duration={c.duration}
-              volume={c.volume}
-              sets={c.sets}
+        {/* Progress measurements */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Progress</Text>
+          {lastSaved ? (
+            <Text style={styles.sectionSub}>Last saved: {lastSaved}</Text>
+          ) : (
+            <Text style={styles.sectionSub}>Track weight and key measurements</Text>
+          )}
+        </View>
+
+        <View style={styles.measureCard}>
+          {editingEntryId ? (
+            <View style={styles.editBanner}>
+              <Text style={styles.editBannerText}>Editing saved entry</Text>
+              <TouchableOpacity
+                onPress={() => setEditingEntryId(null)}
+                style={styles.editBannerBtn}
+              >
+                <Text style={styles.editBannerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Weight (kg)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={weightKg}
+              onChangeText={setWeightKg}
+              placeholder="kg"
+              placeholderTextColor="#999"
             />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Chest (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={chestCm}
+              onChangeText={setChestCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Waist (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={waistCm}
+              onChangeText={setWaistCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Hips (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={hipsCm}
+              onChangeText={setHipsCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Thigh (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={thighCm}
+              onChangeText={setThighCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Upper Arm (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={armCm}
+              onChangeText={setArmCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <View style={styles.measureRow}>
+            <Text style={styles.measureLabel}>Calf (cm)</Text>
+            <TextInput
+              style={styles.measureInput}
+              keyboardType="decimal-pad"
+              value={calfCm}
+              onChangeText={setCalfCm}
+              placeholder="cm"
+              placeholderTextColor="#999"
+            />
+          </View>
+          <TouchableOpacity style={styles.primaryAction} onPress={saveMeasurements}>
+            <Text style={styles.primaryActionText}>Save measurements</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Measurement history</Text>
+            <Text style={styles.sectionSub}>
+              Latest entries (local + cloud, up to 20)
+            </Text>
+          </View>
+          {measureHistory.length > 0 ? (
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={handleClearHistory}
+            >
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {summary ? (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <Text style={styles.summaryTitle}>Change summary</Text>
+              <Text style={styles.summaryRange}>
+                {summary.from} → {summary.to}
+              </Text>
+            </View>
+            <View style={styles.summaryGrid}>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.weight.tone === "up" && styles.summaryMetricUp,
+                  summary.weight.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Weight: {summary.weight.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.chest.tone === "up" && styles.summaryMetricUp,
+                  summary.chest.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Chest: {summary.chest.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.waist.tone === "up" && styles.summaryMetricUp,
+                  summary.waist.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Waist: {summary.waist.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.hips.tone === "up" && styles.summaryMetricUp,
+                  summary.hips.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Hips: {summary.hips.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.thigh.tone === "up" && styles.summaryMetricUp,
+                  summary.thigh.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Thigh: {summary.thigh.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.arm.tone === "up" && styles.summaryMetricUp,
+                  summary.arm.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Arm: {summary.arm.formatted}
+              </Text>
+              <Text
+                style={[
+                  styles.summaryMetric,
+                  summary.calf.tone === "up" && styles.summaryMetricUp,
+                  summary.calf.tone === "down" && styles.summaryMetricDown,
+                ]}
+              >
+                Calf: {summary.calf.formatted}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>
+            Add at least two entries to see changes.
+          </Text>
+        )}
+        {measureHistory.length === 0 ? (
+          <Text style={styles.emptyText}>No measurements saved yet.</Text>
+        ) : (
+          measureHistory.map((m) => (
+            <View key={m.id} style={styles.historyCard}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyLabel}>{m.label}</Text>
+                <Text style={styles.historyWeight}>{m.weight} kg</Text>
+                <View style={styles.historyActions}>
+                  <TouchableOpacity
+                    onPress={() => handleEditHistory(m.id)}
+                    style={styles.historyActionBtn}
+                  >
+                    <Text style={styles.historyActionText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteHistory(m.id)}
+                    style={styles.historyActionBtn}
+                  >
+                    <Text style={styles.historyDeleteText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.historyGrid}>
+                <Text style={styles.historyMetric}>Chest: {m.chest} cm</Text>
+                <Text style={styles.historyMetric}>Waist: {m.waist} cm</Text>
+                <Text style={styles.historyMetric}>Hips: {m.hips} cm</Text>
+                <Text style={styles.historyMetric}>Thigh: {m.thigh} cm</Text>
+                <Text style={styles.historyMetric}>Arm: {m.arm} cm</Text>
+                <Text style={styles.historyMetric}>Calf: {m.calf} cm</Text>
+              </View>
+            </View>
           ))
         )}
       </ScrollView>
@@ -450,7 +1238,7 @@ function ActivityCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#fff",
   },
   topBar: {
     flexDirection: "row",
@@ -462,7 +1250,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#F1F1F1",
+    backgroundColor: "#f0f0f0",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -508,7 +1296,7 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: "row",
-    backgroundColor: "#F3F3F3",
+    backgroundColor: "#f2f2f2",
     borderRadius: 14,
     padding: 4,
     marginBottom: 16,
@@ -525,13 +1313,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   tabActive: {
-    backgroundColor: "#FBEDF1",
+    backgroundColor: "#dedede",
   },
   tabTextActive: {
     color: "#111",
   },
   tabMuted: {
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#f7f7f7",
   },
   loadingText: {
     textAlign: "center",
@@ -540,12 +1328,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     textAlign: "center",
-    color: "#C83737",
+    color: "#222",
     marginVertical: 8,
   },
   emptyText: {
     textAlign: "center",
-    color: "#666",
+    color: "#444",
     marginVertical: 8,
   },
   settingsOverlay: {
@@ -554,7 +1342,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.2)",
+    backgroundColor: "rgba(0,0,0,0.15)",
     justifyContent: "flex-end",
     zIndex: 10,
   },
@@ -590,10 +1378,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 6,
     borderRadius: 12,
-    backgroundColor: "#FFF4F4",
+    backgroundColor: "#f2f2f2",
   },
   settingsActionText: {
-    color: "#C83737",
+    color: "#111",
     fontWeight: "700",
     fontSize: 15,
   },
@@ -604,7 +1392,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 6,
     borderRadius: 12,
-    backgroundColor: "#F6F7FB",
+    backgroundColor: "#f4f4f4",
     marginBottom: 6,
   },
   settingsActionSecondaryText: {
@@ -643,7 +1431,7 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     marginTop: 8,
-    backgroundColor: "#1E3DF0",
+    backgroundColor: "#111",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -664,7 +1452,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   dayItemActive: {
-    backgroundColor: "#FBE9EF",
+    backgroundColor: "#e0e0e0",
   },
   dayText: {
     fontSize: 12,
@@ -681,12 +1469,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#e0e0e0",
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
+    shadowColor: "transparent",
   },
   cardIcon: {
     width: 48,
@@ -695,6 +1480,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    backgroundColor: "#e6e6e6",
   },
   cardTitle: {
     fontSize: 14,
@@ -723,5 +1509,198 @@ const styles = StyleSheet.create({
   cardCalories: {
     fontSize: 12,
     color: "#777",
+  },
+  sectionHeader: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  sectionSub: {
+    marginTop: 4,
+    color: "#666",
+    fontSize: 12,
+  },
+  measureCard: {
+    backgroundColor: "#F7F7F7",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: 16,
+    gap: 12,
+    marginBottom: 12,
+  },
+  measureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  measureLabel: {
+    fontSize: 14,
+    color: "#111",
+    flex: 1,
+  },
+  measureInput: {
+    borderWidth: 1,
+    borderColor: "#DADADA",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: 120,
+    backgroundColor: "#fff",
+    color: "#111",
+  },
+  historyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E2E2",
+    padding: 12,
+    marginBottom: 10,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  historyLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111",
+  },
+  historyWeight: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111",
+  },
+  historyActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  historyActionBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "#F0F0F0",
+  },
+  historyActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111",
+  },
+  historyDeleteText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#C83737",
+  },
+  historyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  historyMetric: {
+    fontSize: 12,
+    color: "#444",
+    backgroundColor: "#F4F4F4",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  editBanner: {
+    backgroundColor: "#111",
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  editBannerText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  editBannerBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+  editBannerBtnText: {
+    fontWeight: "800",
+    fontSize: 12,
+    color: "#111",
+  },
+  summaryCard: {
+    backgroundColor: "#111",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  summaryRange: {
+    color: "#ccc",
+    fontSize: 12,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  summaryMetric: {
+    color: "#fff",
+    backgroundColor: "#1f1f1f",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    fontSize: 12,
+    borderWidth: 1,
+    borderColor: "#2c2c2c",
+  },
+  summaryMetricUp: {
+    borderColor: "#4ade80",
+    color: "#d1fae5",
+  },
+  summaryMetricDown: {
+    borderColor: "#f87171",
+    color: "#fee2e2",
+  },
+  goalCard: {
+    backgroundColor: "#F7F7F7",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: 16,
+    gap: 10,
+    marginBottom: 12,
+  },
+  clearBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
+  },
+  clearBtnText: {
+    color: "#C83737",
+    fontWeight: "800",
+    fontSize: 12,
   },
 });

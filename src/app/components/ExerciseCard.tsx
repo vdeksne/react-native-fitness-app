@@ -11,8 +11,7 @@ export default function ExerciseCard({ item }: Props) {
     <View style={styles.card}>
       <Text style={styles.name}>{item.name}</Text>
       <Text style={styles.meta}>
-        Difficulty: {item.difficulty}{" "}
-        {item.muscle ? `• Muscle: ${item.muscle}` : ""}{" "}
+        {item.muscle ? `Muscle: ${item.muscle}` : ""}{" "}
         {item.type ? `• Type: ${item.type}` : ""}
       </Text>
       {item.targets?.length || item.secondaryTargets?.length ? (
