@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
+import { useTheme } from "../../../context/ThemeContext";
 
 type WorkoutDoc = {
   _id: string;
@@ -22,6 +23,7 @@ type WorkoutDoc = {
 };
 
 export default function Page() {
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
@@ -245,15 +247,15 @@ export default function Page() {
   }, [workouts]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
-        style={styles.scroll}
+        style={[styles.scroll, { backgroundColor: colors.bg }]}
         contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View style={styles.avatar}>
+          <View style={[styles.avatar, { backgroundColor: colors.card }]}>
             <Image
               source={{
                 uri: "https://media.licdn.com/dms/image/v2/D4E03AQHcrn61J7Kujg/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1690920703856?e=1767830400&v=beta&t=6ybsVAxwOmhRFTV8w-KMmEAwcPAmdFc-9s0se84G3SU",
@@ -262,54 +264,122 @@ export default function Page() {
             />
           </View>
           <View>
-            <Text style={styles.greeting}>Hello Viktorija!</Text>
-            <Text style={styles.date}>{today}</Text>
+            <Text style={[styles.greeting, { color: colors.muted }]}>
+              Hello Viktorija!
+            </Text>
+            <Text style={[styles.date, { color: colors.text }]}>{today}</Text>
           </View>
         </View>
 
         {/* Workout Statistics */}
-        <Text style={styles.sectionTitle}>Workout Statistics</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Workout Statistics
+        </Text>
         {loading ? (
-          <ActivityIndicator color="#111" />
+          <ActivityIndicator color={colors.accent} />
         ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: colors.accent }]}>
+            {error}
+          </Text>
         ) : (
           <View style={styles.statsGrid}>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Total Workouts</Text>
-              <Text style={styles.cardValue}>{stats.totalWorkouts}</Text>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Total Workouts
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>
+                {stats.totalWorkouts}
+              </Text>
             </View>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Average Duration</Text>
-              <Text style={styles.cardValue}>{stats.avgMinutes} min</Text>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Average Duration
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>
+                {stats.avgMinutes} min
+              </Text>
             </View>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Total Time</Text>
-              <Text style={styles.cardValue}>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Total Time
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>
                 {Math.round(stats.totalMinutes / 60)} h
               </Text>
             </View>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Weekly Volume</Text>
-              <Text style={styles.cardValue}>{stats.weeklySets} sets</Text>
-              <Text style={styles.cardSubValue}>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Weekly Volume
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>
+                {stats.weeklySets} sets
+              </Text>
+              <Text style={[styles.cardSubValue, { color: colors.muted }]}>
                 {stats.weeklyVolumeKg} kg lifted
               </Text>
             </View>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Active Streak</Text>
-              <Text style={styles.cardValue}>—</Text>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Active Streak
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>—</Text>
             </View>
-            <View style={[styles.card, styles.cardSmall]}>
-              <Text style={styles.cardLabel}>Best Streak</Text>
-              <Text style={styles.cardValue}>—</Text>
+            <View
+              style={[
+                styles.card,
+                styles.cardSmall,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: colors.muted }]}>
+                Best Streak
+              </Text>
+              <Text style={[styles.cardValue, { color: colors.text }]}>—</Text>
             </View>
           </View>
         )}
 
         {/* Calendar */}
-        <Text style={styles.sectionTitle}>Workout Calendar</Text>
-        <View style={[styles.card, styles.calendarCard]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Workout Calendar
+        </Text>
+        <View
+          style={[
+            styles.card,
+            styles.calendarCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.viewTabs}>
             {["week", "month", "year"].map((mode) => (
               <TouchableOpacity
@@ -317,6 +387,7 @@ export default function Page() {
                 style={[
                   styles.viewTab,
                   viewMode === mode && styles.viewTabActive,
+                  { backgroundColor: colors.bg, borderColor: colors.border },
                 ]}
                 onPress={() => setViewMode(mode as "week" | "month" | "year")}
               >
@@ -324,6 +395,7 @@ export default function Page() {
                   style={[
                     styles.viewTabText,
                     viewMode === mode && styles.viewTabTextActive,
+                    { color: viewMode === mode ? colors.text : colors.muted },
                   ]}
                 >
                   {mode[0].toUpperCase() + mode.slice(1)}
@@ -332,8 +404,12 @@ export default function Page() {
             ))}
           </View>
           <View style={styles.calendarHeader}>
-            <Text style={styles.calendarMonth}>{calendarMonthLabel}</Text>
-            <Text style={styles.calendarLegend}>● Workout | ○ Today</Text>
+            <Text style={[styles.calendarMonth, { color: colors.text }]}>
+              {calendarMonthLabel}
+            </Text>
+            <Text style={[styles.calendarLegend, { color: colors.muted }]}>
+              ● Workout | ○ Today
+            </Text>
           </View>
           {viewMode === "week" && (
             <View style={styles.weekGrid}>
@@ -366,7 +442,10 @@ export default function Page() {
             <>
               <View style={styles.calendarWeekRow}>
                 {["S", "M", "T", "W", "T", "F", "S"].map((d, idx) => (
-                  <Text key={`${d}-${idx}`} style={styles.calendarWeekday}>
+                  <Text
+                    key={`${d}-${idx}`}
+                    style={[styles.calendarWeekday, { color: colors.muted }]}
+                  >
                     {d}
                   </Text>
                 ))}
@@ -380,6 +459,15 @@ export default function Page() {
                           styles.calendarDot,
                           day.hasWorkout && styles.calendarDotActive,
                           day.isToday && styles.calendarDotToday,
+                          {
+                            backgroundColor: colors.bg,
+                            borderColor: colors.border,
+                          },
+                          day.hasWorkout && {
+                            backgroundColor: colors.accent,
+                            borderColor: colors.accentDark,
+                          },
+                          day.isToday && { borderColor: colors.accent },
                         ]}
                       >
                         <Text
@@ -387,6 +475,7 @@ export default function Page() {
                             styles.calendarDayText,
                             (day.hasWorkout || day.isToday) &&
                               styles.calendarDayTextActive,
+                            { color: colors.text },
                           ]}
                         >
                           {day.label}
@@ -402,9 +491,22 @@ export default function Page() {
           {viewMode === "year" && (
             <View style={styles.yearGrid}>
               {yearMonths.map((m) => (
-                <View key={m.key} style={styles.yearCell}>
-                  <Text style={styles.yearLabel}>{m.label}</Text>
-                  <Text style={styles.yearCount}>{m.count} workouts</Text>
+                <View
+                  key={m.key}
+                  style={[
+                    styles.yearCell,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.yearLabel, { color: colors.text }]}>
+                    {m.label}
+                  </Text>
+                  <Text style={[styles.yearCount, { color: colors.muted }]}>
+                    {m.count} workouts
+                  </Text>
                 </View>
               ))}
             </View>
@@ -412,18 +514,34 @@ export default function Page() {
         </View>
 
         {/* Last Workouts */}
-        <Text style={styles.sectionTitle}>Last Workouts</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Last Workouts
+        </Text>
         {loading ? (
-          <ActivityIndicator color="#111" />
+          <ActivityIndicator color={colors.accent} />
         ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: colors.accent }]}>
+            {error}
+          </Text>
         ) : (
           <View style={styles.list}>
             {lastWorkouts.map((item, idx) => (
-              <View key={`${item.title}-${idx}`} style={styles.listItem}>
-                <Text style={styles.listTitle}>{item.title}</Text>
-                <Text style={styles.listDuration}>{item.duration}</Text>
-                <Text style={styles.listSummary}>{item.summary}</Text>
+              <View
+                key={`${item.title}-${idx}`}
+                style={[
+                  styles.listItem,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.listTitle, { color: colors.muted }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.listDuration, { color: colors.text }]}>
+                  {item.duration}
+                </Text>
+                <Text style={[styles.listSummary, { color: colors.muted }]}>
+                  {item.summary}
+                </Text>
               </View>
             ))}
           </View>

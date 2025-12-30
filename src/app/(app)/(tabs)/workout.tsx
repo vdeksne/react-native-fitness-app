@@ -28,6 +28,7 @@ import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
 import * as SecureStore from "expo-secure-store";
+import { useTheme } from "../../../context/ThemeContext";
 
 type Unit = "lbs" | "kg";
 
@@ -147,6 +148,8 @@ const defaultWeeklyPlan: PlanDay[] = [
 ];
 
 export default function Workout() {
+  const { colors, theme } = useTheme();
+  const buttonTextColor = theme === "dark" ? colors.text : "#111";
   const supabaseUrl =
     process.env.EXPO_PUBLIC_SUPABASE_URL ||
     Constants.expoConfig?.extra?.supabaseUrl ||
@@ -833,25 +836,38 @@ export default function Workout() {
 
   if (!started) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <ScrollView
           contentContainerStyle={styles.starterScroll}
           showsVerticalScrollIndicator={false}
+          style={{ backgroundColor: colors.bg }}
         >
           <View style={styles.starterHeader}>
-            <Text style={styles.starterTitle}>This week&apos;s plan</Text>
-            <Text style={styles.starterSubtitle}>
+            <Text style={[styles.starterTitle, { color: colors.text }]}>
+              This week&apos;s plan
+            </Text>
+            <Text style={[styles.starterSubtitle, { color: colors.muted }]}>
               Tap a day to jump in or edit the plan before you start.
             </Text>
           </View>
 
           <View style={styles.planHeaderRow}>
-            <Text style={styles.starterTitle}>Weekly Overview</Text>
+            <Text style={[styles.starterTitle, { color: colors.text }]}>
+              Weekly Overview
+            </Text>
             <TouchableOpacity
-              style={styles.planActionBtn}
+              style={[
+                styles.planActionBtn,
+                {
+                  backgroundColor: colors.accent,
+                  borderColor: colors.accentDark,
+                },
+              ]}
               onPress={() => openPlanModal()}
             >
-              <Text style={styles.planActionText}>+ Add day</Text>
+              <Text style={[styles.planActionText, { color: buttonTextColor }]}>
+                + Add day
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -859,68 +875,139 @@ export default function Workout() {
             {weeklyPlan.map((plan) => (
               <TouchableOpacity
                 key={plan.id}
-                style={[styles.planCard, { backgroundColor: plan.color }]}
+                style={[
+                  styles.planCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: plan.color || colors.border,
+                  },
+                ]}
                 activeOpacity={0.9}
                 onPress={() => startFromPlan(plan)}
               >
                 <View style={styles.planCardHeader}>
                   <View>
-                    <Text style={styles.planDay}>{plan.dayLabel}</Text>
-                    <Text style={styles.planFocus}>{plan.focus}</Text>
+                    <Text style={[styles.planDay, { color: colors.muted }]}>
+                      {plan.dayLabel}
+                    </Text>
+                    <Text style={[styles.planFocus, { color: colors.text }]}>
+                      {plan.focus}
+                    </Text>
                   </View>
                   <View style={styles.planRightChips}>
                     {completedPlans.includes(plan.value) ? (
-                      <View style={styles.planDoneChip}>
+                      <View
+                        style={[
+                          styles.planDoneChip,
+                          {
+                            backgroundColor: colors.bg,
+                            borderColor: colors.accentDark,
+                          },
+                        ]}
+                      >
                         <Ionicons
                           name="checkmark-circle"
                           size={14}
-                          color="#0F5132"
+                          color={colors.accent}
                         />
-                        <Text style={styles.planDoneText}>Done</Text>
+                        <Text
+                          style={[
+                            styles.planDoneText,
+                            { color: buttonTextColor },
+                          ]}
+                        >
+                          Done
+                        </Text>
                       </View>
                     ) : null}
                     <TouchableOpacity
-                      style={styles.planEditChip}
+                      style={[
+                        styles.planEditChip,
+                        {
+                          backgroundColor: colors.bg,
+                          borderColor: colors.border,
+                        },
+                      ]}
                       onPress={(e) => {
                         e.stopPropagation();
                         openPlanModal(plan);
                       }}
                     >
-                      <Ionicons name="create-outline" size={14} color="#111" />
-                      <Text style={styles.planEditText}>Edit</Text>
+                      <Ionicons
+                        name="create-outline"
+                        size={14}
+                        color={buttonTextColor}
+                      />
+                      <Text
+                        style={[
+                          styles.planEditText,
+                          { color: buttonTextColor },
+                        ]}
+                      >
+                        Edit
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 <View style={styles.planExercises}>
                   {plan.exercises.length === 0 ? (
-                    <Text style={styles.planExerciseTextFaint}>
+                    <Text
+                      style={[
+                        styles.planExerciseTextFaint,
+                        { color: colors.muted },
+                      ]}
+                    >
                       Add exercises to this day
                     </Text>
                   ) : null}
                   {plan.exercises.slice(0, 4).map((line, idx) => (
                     <View key={`${plan.id}-ex-${idx}`} style={styles.planLine}>
                       <View style={styles.planDot} />
-                      <Text style={styles.planExerciseText}>{line}</Text>
+                      <Text
+                        style={[
+                          styles.planExerciseText,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {line}
+                      </Text>
                     </View>
                   ))}
                 </View>
 
                 <View style={styles.planFooterRow}>
-                  <View style={styles.planPill}>
-                    <Text style={styles.planPillText}>Tap to start</Text>
+                  <View
+                    style={[
+                      styles.planPill,
+                      { backgroundColor: colors.accentDark || plan.color },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.planPillText, { color: buttonTextColor }]}
+                    >
+                      Tap to start
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
             ))}
 
             <TouchableOpacity
-              style={[styles.planCard, styles.planAddCard]}
+              style={[
+                styles.planCard,
+                styles.planAddCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={() => openPlanModal()}
               activeOpacity={0.9}
             >
-              <Text style={styles.planAddText}>+ New day</Text>
-              <Text style={styles.planAddHint}>Build your own split</Text>
+              <Text style={[styles.planAddText, { color: buttonTextColor }]}>
+                + New day
+              </Text>
+              <Text style={[styles.planAddHint, { color: colors.muted }]}>
+                Build your own split
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -975,8 +1062,19 @@ export default function Workout() {
             )}
           </View>
 
-          <TouchableOpacity style={styles.successBtn} onPress={handleStart}>
-            <Text style={styles.successBtnText}>Start workout</Text>
+          <TouchableOpacity
+            style={[
+              styles.successBtn,
+              {
+                backgroundColor: colors.accent,
+                borderColor: colors.accentDark,
+              },
+            ]}
+            onPress={handleStart}
+          >
+            <Text style={[styles.successBtnText, { color: buttonTextColor }]}>
+              Start workout
+            </Text>
           </TouchableOpacity>
         </ScrollView>
         {planEditorModal}
@@ -985,8 +1083,13 @@ export default function Workout() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
         <View>
           <Text style={styles.headerTitle}>Active Workout</Text>
           <Text style={styles.headerSub}>

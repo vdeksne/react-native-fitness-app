@@ -12,7 +12,8 @@
         {
           "origin": "https://localhost"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "name": "fit-app",
     "slug": "fit-app",

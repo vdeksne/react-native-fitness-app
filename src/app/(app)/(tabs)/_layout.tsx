@@ -1,24 +1,50 @@
+import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { View } from "react-native";
+import Svg, { Path } from "react-native-svg";
+import { useTheme } from "../../../context/ThemeContext";
+
+const Logo = ({ color }: { color: string }) => (
+  <View style={{ alignItems: "center", justifyContent: "center", height: 36 }}>
+    <Svg width={36} height={30} viewBox="0 0 129 109" fill="none">
+      <Path
+        d="M52.0467 105.63L0 56.8698L52.0467 8.10991L6.55598 56.8698L52.0467 105.63Z"
+        fill={color}
+      />
+      <Path
+        d="M114.476 56.7268L65.7064 109L16.9561 56.7268L65.7064 98.7506L114.476 56.7268Z"
+        fill={color}
+      />
+      <Path
+        d="M128.737 56.7948L76.9875 105.628L122.747 57.0172L69.8244 9.04739L65.697 73.5416C65.697 73.5416 65.7857 9.87149 65.738 0L128.737 56.7948Z"
+        fill={color}
+      />
+    </Svg>
+  </View>
+);
 
 export default function Layout() {
+  const { colors } = useTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
-        tabBarActiveTintColor: "#111",
-        tabBarInactiveTintColor: "#777",
+        headerTitle: () => <Logo color={colors.accent} />,
+        headerTitleAlign: "center",
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: "#fff",
-          borderTopColor: "#e0e0e0",
+          backgroundColor: colors.tabBg,
+          borderTopColor: colors.border,
         },
         headerStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: colors.headerBg,
         },
         headerTitleStyle: {
-          color: "#111",
+          color: colors.text,
         },
-        headerTintColor: "#111",
+        headerTintColor: colors.accent,
       }}
     >
       <Tabs.Screen

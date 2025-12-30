@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
+import { useTheme } from "../../../context/ThemeContext";
 
 type WorkoutSet = { reps?: number; weight?: number; weightUnit?: string };
 type WorkoutExercise = { name: string; sets: WorkoutSet[] };
@@ -22,6 +23,7 @@ type WorkoutDoc = {
 };
 
 export default function History() {
+  const { colors } = useTheme();
   const [workouts, setWorkouts] = useState<WorkoutDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,30 +134,48 @@ export default function History() {
   }, [latest]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
         <TouchableOpacity>
-          <Text style={styles.link}>History</Text>
+          <Text style={[styles.link, { color: colors.text }]}>History</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Workout Record</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Workout Record
+        </Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: colors.bg }}
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.summaryCard}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.summaryHeaderRow}>
-            <Text style={styles.summaryTitle}>Latest Workout</Text>
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>
+              Latest Workout
+            </Text>
             {workouts.length ? (
               <TouchableOpacity
-                style={[styles.clearBtn, saving && { opacity: 0.6 }]}
+                style={[
+                  styles.clearBtn,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  saving && { opacity: 0.6 },
+                ]}
                 onPress={clearWorkouts}
                 disabled={saving}
               >
-                <Text style={styles.clearBtnText}>
+                <Text style={[styles.clearBtnText, { color: colors.text }]}>
                   {saving ? "Clearing..." : "Clear"}
                 </Text>
               </TouchableOpacity>
@@ -164,52 +184,69 @@ export default function History() {
 
           {loading ? (
             <View style={styles.loaderRow}>
-              <ActivityIndicator color="#1E3DF0" />
-              <Text style={styles.loaderText}>Loading...</Text>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={[styles.loaderText, { color: colors.text }]}>
+                Loading...
+              </Text>
             </View>
           ) : error ? (
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={[styles.errorText, { color: colors.accent }]}>{error}</Text>
           ) : (
             <>
               <View style={styles.summaryRow}>
-                <Ionicons name="calendar-outline" size={16} color="#777" />
-                <Text style={styles.summaryText}>{summary.date}</Text>
+                <Ionicons name="calendar-outline" size={16} color={colors.muted} />
+                <Text style={[styles.summaryText, { color: colors.text }]}>
+                  {summary.date}
+                </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Ionicons name="time-outline" size={16} color="#777" />
-                <Text style={styles.summaryText}>{summary.duration}</Text>
+                <Ionicons name="time-outline" size={16} color={colors.muted} />
+                <Text style={[styles.summaryText, { color: colors.text }]}>
+                  {summary.duration}
+                </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Ionicons name="barbell-outline" size={16} color="#777" />
-                <Text style={styles.summaryText}>
+                <Ionicons name="barbell-outline" size={16} color={colors.muted} />
+                <Text style={[styles.summaryText, { color: colors.text }]}>
                   {summary.exerciseCount} exercises
                 </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Ionicons name="stats-chart-outline" size={16} color="#777" />
-                <Text style={styles.summaryText}>{summary.setCount} total sets</Text>
+                <Ionicons name="stats-chart-outline" size={16} color={colors.muted} />
+                <Text style={[styles.summaryText, { color: colors.text }]}>
+                  {summary.setCount} total sets
+                </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Ionicons name="fitness-outline" size={16} color="#777" />
-                <Text style={styles.summaryText}>{summary.volume} total volume</Text>
+                <Ionicons name="fitness-outline" size={16} color={colors.muted} />
+                <Text style={[styles.summaryText, { color: colors.text }]}>
+                  {summary.volume} total volume
+                </Text>
               </View>
             </>
           )}
         </View>
 
         {loading ? null : workouts.length === 0 ? (
-          <Text style={styles.emptyText}>No workouts saved yet.</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
+            No workouts saved yet.
+          </Text>
         ) : (
           workouts.map((w) => (
             <View key={w._id} style={{ marginBottom: 16 }}>
-              <Text style={styles.workoutDate}>
+              <Text style={[styles.workoutDate, { color: colors.text }]}>
                 {w.date ? new Date(w.date).toLocaleString() : "Unknown date"}
               </Text>
               <TouchableOpacity
-                style={styles.deletePill}
+                style={[
+                  styles.deletePill,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
                 onPress={() => deleteWorkout(w._id)}
               >
-                <Text style={styles.deletePillText}>Delete</Text>
+                <Text style={[styles.deletePillText, { color: colors.text }]}>
+                  Delete
+                </Text>
               </TouchableOpacity>
               {w.exercises.map((ex, idx) => (
                 <ExerciseCard
@@ -221,6 +258,12 @@ export default function History() {
                     weight: s.weight ? `${s.weight} ${s.weightUnit || "kg"}` : "Bodyweight",
                   }))}
                   volume={`${ex.sets.reduce((acc, s) => acc + (s.reps || 0) * (s.weight || 0), 0)} kg`}
+                  themeColors={{
+                    card: colors.card,
+                    border: colors.border,
+                    text: colors.text,
+                    muted: colors.muted,
+                  }}
                 />
               ))}
             </View>

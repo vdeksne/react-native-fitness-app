@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 // @ts-ignore expo-image-picker types resolved at runtime
 import * as ImagePicker from "expo-image-picker";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
+import { useTheme } from "../../../context/ThemeContext";
 type ApiExercise = {
   exerciseId: string;
   name: string;
@@ -83,6 +84,8 @@ const dayOptions = [
 ];
 
 export default function Exercises() {
+  const { colors, theme } = useTheme();
+  const buttonTextColor = theme === "dark" ? colors.text : "#111";
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"api" | "local">("api");
@@ -499,44 +502,89 @@ export default function Exercises() {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 140 }}
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      contentContainerStyle={{ paddingBottom: 140, paddingHorizontal: 16 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.title}>Exercises</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Exercises</Text>
 
       <View style={styles.searchRow}>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           placeholder="Search by name or muscle (e.g., biceps, chest, curl...)"
-          placeholderTextColor="#111"
+          placeholderTextColor={colors.muted}
           value={query}
           onChangeText={setQuery}
           returnKeyType="search"
           onSubmitEditing={fetchExercises}
         />
-        <Text style={styles.searchHint}>Press enter to search</Text>
+        <Text style={[styles.searchHint, { color: colors.muted }]}>
+          Press enter to search
+        </Text>
       </View>
 
       <View style={styles.toggleRow}>
         <Text
-          style={[styles.toggle, source === "api" && styles.toggleActive]}
+          style={[
+            styles.toggle,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.card,
+            },
+            source === "api" && {
+              backgroundColor: colors.accent,
+              color: buttonTextColor,
+              borderColor: colors.accentDark,
+            },
+          ]}
           onPress={() => setSource("api")}
         >
           API
         </Text>
         <Text
-          style={[styles.toggle, source === "local" && styles.toggleActive]}
+          style={[
+            styles.toggle,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.card,
+            },
+            source === "local" && {
+              backgroundColor: colors.accent,
+              color: buttonTextColor,
+              borderColor: colors.accentDark,
+            },
+          ]}
           onPress={() => setSource("local")}
         >
           Local DB
         </Text>
       </View>
 
-      <View style={styles.addBox}>
+      <View
+        style={[
+          styles.addBox,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
         {!showAddForm ? (
           <TouchableOpacity onPress={() => setShowAddForm(true)}>
-            <Text style={styles.addButton}>+ Add new exercise</Text>
+            <Text
+              style={[
+                styles.addButton,
+                { color: buttonTextColor, backgroundColor: colors.bg },
+              ]}
+            >
+              + Add new exercise
+            </Text>
           </TouchableOpacity>
         ) : (
           <ScrollView
@@ -545,18 +593,35 @@ export default function Exercises() {
             nestedScrollEnabled
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.addTitle}>New Exercise</Text>
+            <Text style={[styles.addTitle, { color: colors.text }]}>
+              New Exercise
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               placeholder="Name"
-              placeholderTextColor="#111"
+              placeholderTextColor={colors.muted}
               value={newName}
               onChangeText={setNewName}
             />
             <TextInput
-              style={[styles.input, styles.multiline]}
+              style={[
+                styles.input,
+                styles.multiline,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               placeholder="Description"
-              placeholderTextColor="#111"
+              placeholderTextColor={colors.muted}
               value={newDescription}
               onChangeText={setNewDescription}
               multiline
@@ -572,15 +637,25 @@ export default function Exercises() {
             */}
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               placeholder="Image URL (optional)"
-              placeholderTextColor="#111"
+              placeholderTextColor={colors.muted}
               value={newImageUrl}
               onChangeText={setNewImageUrl}
               autoCapitalize="none"
             />
             <TouchableOpacity
-              style={styles.pickButton}
+              style={[
+                styles.pickButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={async () => {
                 const perm =
                   await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -605,10 +680,15 @@ export default function Exercises() {
                 }
               }}
             >
-              <Text style={styles.pickButtonText}>Pick image from device</Text>
+              <Text style={[styles.pickButtonText, { color: colors.text }]}>
+                Pick image from device
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.pickButton}
+              style={[
+                styles.pickButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={async () => {
                 const perm = await ImagePicker.requestCameraPermissionsAsync();
                 if (perm.status !== "granted") {
@@ -630,7 +710,9 @@ export default function Exercises() {
                 }
               }}
             >
-              <Text style={styles.pickButtonText}>Take photo</Text>
+              <Text style={[styles.pickButtonText, { color: colors.text }]}>
+                Take photo
+              </Text>
             </TouchableOpacity>
             {newImageUrl.trim() ? (
               <Image

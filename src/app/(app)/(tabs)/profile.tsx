@@ -9,11 +9,13 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Switch,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
 import { useRouter } from "expo-router";
 import { useAuthContext } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 import * as SecureStore from "expo-secure-store";
 
 const dayLabels = ["5", "6", "7", "Now, July 8", "9", "10", "11"];
@@ -76,6 +78,7 @@ export default function Profile() {
   const [goalArm, setGoalArm] = useState<string>("");
   const [goalCalf, setGoalCalf] = useState<string>("");
   const [goalSavedAt, setGoalSavedAt] = useState<string | null>(null);
+  const { theme, setTheme, toggle, colors } = useTheme();
   const canSyncMeasurements =
     !!(
       process.env.EXPO_PUBLIC_SUPABASE_URL ||
@@ -111,6 +114,7 @@ export default function Profile() {
       to: newest.label,
     };
   }, [measureHistory]);
+
 
   useEffect(() => {
     const load = async () => {
@@ -634,25 +638,61 @@ export default function Profile() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {showSettings ? (
         <TouchableOpacity
           activeOpacity={1}
-          style={styles.settingsOverlay}
+          style={[
+            styles.settingsOverlay,
+            { backgroundColor: theme === "dark" ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.15)" },
+          ]}
           onPress={() => setShowSettings(false)}
         >
           <TouchableOpacity
             activeOpacity={1}
-            style={styles.settingsSheet}
+            style={[
+              styles.settingsSheet,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.settingsGrabber} />
-            <Text style={styles.settingsTitle}>Settings</Text>
+            <View
+              style={[
+                styles.settingsGrabber,
+                { backgroundColor: colors.muted, opacity: 0.6 },
+              ]}
+            />
+            <Text style={[styles.settingsTitle, { color: colors.text }]}>Settings</Text>
 
             {settingsMode === "menu" && (
               <>
+                <View
+                  style={[
+                    styles.themeRow,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                >
+                  <View>
+                    <Text style={[styles.sectionTitle, { marginBottom: 4, color: colors.text }]}>
+                      Theme
+                    </Text>
+                    <Text style={[styles.sectionSub, { color: colors.muted }]}>
+                      Switch between light and dark
+                    </Text>
+                  </View>
+                  <Switch
+                    value={theme === "dark"}
+                    onValueChange={(v) => setTheme(v ? "dark" : "light")}
+                    thumbColor={theme === "dark" ? colors.accentDark : "#fff"}
+                    trackColor={{ false: "#d4d4d4", true: colors.accent }}
+                  />
+                </View>
+
                 <TouchableOpacity
-                  style={styles.settingsActionSecondary}
+                  style={[
+                    styles.settingsActionSecondary,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                   onPress={() => {
                     setFormEmail(email || "");
                     setNewPass("");
@@ -660,25 +700,31 @@ export default function Profile() {
                     setSettingsMode("set");
                   }}
                 >
-                  <Ionicons name="key-outline" size={18} color="#111" />
-                  <Text style={styles.settingsActionSecondaryText}>
+                  <Ionicons name="key-outline" size={18} color={colors.text} />
+                  <Text style={[styles.settingsActionSecondaryText, { color: colors.text }]}>
                     Set password
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.settingsActionSecondary}
+                  style={[
+                    styles.settingsActionSecondary,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                   onPress={() => {
                     setFormEmail(email || "");
                     setSettingsMode("reset");
                   }}
                 >
-                  <Ionicons name="refresh-outline" size={18} color="#111" />
-                  <Text style={styles.settingsActionSecondaryText}>
+                  <Ionicons name="refresh-outline" size={18} color={colors.text} />
+                  <Text style={[styles.settingsActionSecondaryText, { color: colors.text }]}>
                     Reset password
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.settingsAction}
+                  style={[
+                    styles.settingsAction,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                   onPress={() => {
                     setEmail(null);
                     setShowSettings(false);
@@ -686,16 +732,21 @@ export default function Profile() {
                   }}
                 >
                   <Ionicons name="log-out-outline" size={18} color="#C83737" />
-                  <Text style={styles.settingsActionText}>Log out</Text>
+                  <Text style={[styles.settingsActionText, { color: colors.text }]}>
+                    Log out
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
 
             {settingsMode === "set" && (
-              <View style={styles.formBlock}>
-                <Text style={styles.formLabel}>Email</Text>
+              <View style={[styles.formBlock, { backgroundColor: colors.card }]}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Email</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+                  ]}
                   value={formEmail}
                   onChangeText={setFormEmail}
                   autoCapitalize="none"
@@ -704,24 +755,33 @@ export default function Profile() {
                   editable={!email}
                   selectTextOnFocus={!email}
                 />
-                <Text style={styles.formLabel}>New password</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>New password</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+                  ]}
                   value={newPass}
                   onChangeText={setNewPass}
                   secureTextEntry
                   placeholder="Enter new password"
                 />
-                <Text style={styles.formLabel}>Confirm password</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Confirm password</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+                  ]}
                   value={confirmPass}
                   onChangeText={setConfirmPass}
                   secureTextEntry
                   placeholder="Confirm password"
                 />
                 <TouchableOpacity
-                  style={styles.primaryAction}
+                  style={[
+                    styles.primaryAction,
+                    { backgroundColor: colors.accent, borderColor: colors.accentDark },
+                  ]}
                   onPress={() => {
                     if (!formEmail) {
                       Alert.alert("Missing email", "Please enter your email.");
@@ -743,19 +803,25 @@ export default function Profile() {
                   <Text style={styles.primaryActionText}>Save password</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.settingsCancel}
+                  style={[
+                    styles.settingsCancel,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                   onPress={() => setSettingsMode("menu")}
                 >
-                  <Text style={styles.settingsCancelText}>Back</Text>
+                  <Text style={[styles.settingsCancelText, { color: colors.text }]}>Back</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {settingsMode === "reset" && (
-              <View style={styles.formBlock}>
-                <Text style={styles.formLabel}>Email</Text>
+              <View style={[styles.formBlock, { backgroundColor: colors.card }]}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>Email</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+                  ]}
                   value={formEmail}
                   onChangeText={setFormEmail}
                   autoCapitalize="none"
@@ -765,7 +831,10 @@ export default function Profile() {
                   selectTextOnFocus={!email}
                 />
                 <TouchableOpacity
-                  style={styles.primaryAction}
+                  style={[
+                    styles.primaryAction,
+                    { backgroundColor: colors.accent, borderColor: colors.accentDark },
+                  ]}
                   onPress={() => {
                     if (!formEmail) {
                       Alert.alert("Missing email", "Please enter your email.");
@@ -780,32 +849,41 @@ export default function Profile() {
                   <Text style={styles.primaryActionText}>Send reset link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.settingsCancel}
+                  style={[
+                    styles.settingsCancel,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                   onPress={() => setSettingsMode("menu")}
                 >
-                  <Text style={styles.settingsCancelText}>Back</Text>
+                  <Text style={[styles.settingsCancelText, { color: colors.text }]}>Back</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {settingsMode === "menu" && (
               <TouchableOpacity
-                style={styles.settingsCancel}
+                style={[
+                  styles.settingsCancel,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
                 onPress={() => {
                   setShowSettings(false);
                   setSettingsMode("menu");
                 }}
               >
-                <Text style={styles.settingsCancelText}>Close</Text>
+                <Text style={[styles.settingsCancelText, { color: colors.text }]}>Close</Text>
               </TouchableOpacity>
             )}
 
             {settingsMode !== "menu" && (
               <TouchableOpacity
-                style={styles.settingsCancel}
+                style={[
+                  styles.settingsCancel,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
                 onPress={() => setSettingsMode("menu")}
               >
-                <Text style={styles.settingsCancelText}>Cancel</Text>
+                <Text style={[styles.settingsCancelText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -813,21 +891,21 @@ export default function Profile() {
       ) : null}
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: colors.bg }}
         contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.iconCircle}>
-            <Ionicons name="close" size={18} color="#111" />
+          <TouchableOpacity style={[styles.iconCircle, { backgroundColor: colors.card }]}>
+            <Ionicons name="close" size={18} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Your Profile</Text>
+          <Text style={[styles.topTitle, { color: colors.text }]}>Your Profile</Text>
           <TouchableOpacity
-            style={styles.iconCircle}
+            style={[styles.iconCircle, { backgroundColor: colors.card }]}
             onPress={() => setShowSettings(true)}
           >
-            <Ionicons name="settings-outline" size={18} color="#111" />
+            <Ionicons name="settings-outline" size={18} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -840,91 +918,117 @@ export default function Profile() {
             style={styles.avatar}
           />
         </View>
-        <Text style={styles.name}>Viktorija Deksne</Text>
+        <Text style={[styles.name, { color: colors.text }]}>Viktorija Deksne</Text>
 
         {/* Goal setting */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Goal</Text>
-          <Text style={styles.sectionSub}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Goal</Text>
+          <Text style={[styles.sectionSub, { color: colors.muted }]}>
             {goalSavedAt ? `Last saved: ${goalSavedAt}` : "Set ideal measurements to keep on track"}
           </Text>
         </View>
-        <View style={styles.goalCard}>
+        <View
+          style={[
+            styles.goalCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Goal weight (kg)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Goal weight (kg)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalWeight}
               onChangeText={setGoalWeight}
               placeholder="e.g. 58"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Chest (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Chest (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalChest}
               onChangeText={setGoalChest}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Waist (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Waist (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalWaist}
               onChangeText={setGoalWaist}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Hips (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Hips (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalHips}
               onChangeText={setGoalHips}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Thigh (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Thigh (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalThigh}
               onChangeText={setGoalThigh}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Upper Arm (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Upper Arm (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalArm}
               onChangeText={setGoalArm}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Calf (cm)</Text>
+            <Text style={[styles.measureLabel, { color: colors.text }]}>Calf (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+              style={[
+                styles.measureInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+              ]}
               keyboardType="decimal-pad"
               value={goalCalf}
               onChangeText={setGoalCalf}
               placeholder="cm"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.muted}
             />
           </View>
           <TouchableOpacity style={styles.primaryAction} onPress={saveGoal}>
@@ -969,7 +1073,12 @@ export default function Profile() {
           )}
         </View>
 
-        <View style={styles.measureCard}>
+        <View
+          style={[
+            styles.measureCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           {editingEntryId ? (
             <View style={styles.editBanner}>
               <Text style={styles.editBannerText}>Editing saved entry</Text>
@@ -983,80 +1092,101 @@ export default function Profile() {
           ) : null}
 
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Weight (kg)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Weight (kg)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={weightKg}
               onChangeText={setWeightKg}
               placeholder="kg"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Chest (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Chest (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={chestCm}
               onChangeText={setChestCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Waist (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Waist (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={waistCm}
               onChangeText={setWaistCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Hips (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Hips (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={hipsCm}
               onChangeText={setHipsCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Thigh (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Thigh (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={thighCm}
               onChangeText={setThighCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Upper Arm (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Upper Arm (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={armCm}
               onChangeText={setArmCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <View style={styles.measureRow}>
-            <Text style={styles.measureLabel}>Calf (cm)</Text>
+          <Text style={[styles.measureLabel, { color: colors.text }]}>Calf (cm)</Text>
             <TextInput
-              style={styles.measureInput}
+            style={[
+              styles.measureInput,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
+            ]}
               keyboardType="decimal-pad"
               value={calfCm}
               onChangeText={setCalfCm}
               placeholder="cm"
-              placeholderTextColor="#999"
+            placeholderTextColor={colors.muted}
             />
           </View>
           <TouchableOpacity style={styles.primaryAction} onPress={saveMeasurements}>
@@ -1163,32 +1293,58 @@ export default function Profile() {
           <Text style={styles.emptyText}>No measurements saved yet.</Text>
         ) : (
           measureHistory.map((m) => (
-            <View key={m.id} style={styles.historyCard}>
+            <View
+              key={m.id}
+              style={[
+                styles.historyCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               <View style={styles.historyHeader}>
-                <Text style={styles.historyLabel}>{m.label}</Text>
-                <Text style={styles.historyWeight}>{m.weight} kg</Text>
+                <Text style={[styles.historyLabel, { color: colors.text }]}>{m.label}</Text>
+                <Text style={[styles.historyWeight, { color: colors.text }]}>
+                  {m.weight} kg
+                </Text>
                 <View style={styles.historyActions}>
                   <TouchableOpacity
                     onPress={() => handleEditHistory(m.id)}
-                    style={styles.historyActionBtn}
+                    style={[
+                      styles.historyActionBtn,
+                      { backgroundColor: colors.bg, borderColor: colors.border },
+                    ]}
                   >
-                    <Text style={styles.historyActionText}>Edit</Text>
+                    <Text style={[styles.historyActionText, { color: colors.text }]}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleDeleteHistory(m.id)}
-                    style={styles.historyActionBtn}
+                    style={[
+                      styles.historyActionBtn,
+                      { backgroundColor: colors.bg, borderColor: colors.border },
+                    ]}
                   >
                     <Text style={styles.historyDeleteText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
               <View style={styles.historyGrid}>
-                <Text style={styles.historyMetric}>Chest: {m.chest} cm</Text>
-                <Text style={styles.historyMetric}>Waist: {m.waist} cm</Text>
-                <Text style={styles.historyMetric}>Hips: {m.hips} cm</Text>
-                <Text style={styles.historyMetric}>Thigh: {m.thigh} cm</Text>
-                <Text style={styles.historyMetric}>Arm: {m.arm} cm</Text>
-                <Text style={styles.historyMetric}>Calf: {m.calf} cm</Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Chest: {m.chest} cm
+                </Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Waist: {m.waist} cm
+                </Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Hips: {m.hips} cm
+                </Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Thigh: {m.thigh} cm
+                </Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Arm: {m.arm} cm
+                </Text>
+                <Text style={[styles.historyMetric, { color: colors.muted }]}>
+                  Calf: {m.calf} cm
+                </Text>
               </View>
             </View>
           ))
@@ -1274,6 +1430,15 @@ const styles = StyleSheet.create({
     color: "#111",
     textAlign: "center",
     marginBottom: 20,
+  },
+  themeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
   },
   metricsRow: {
     flexDirection: "row",

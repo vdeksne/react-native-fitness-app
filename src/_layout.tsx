@@ -1,6 +1,7 @@
 import "./shims/platform-constants"; // ensure PlatformConstants exists before anything else
 import { Slot } from "expo-router";
 import { Platform, NativeModules } from "react-native";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Shim: ensure PlatformConstants exists for any platform to avoid TurboModuleRegistry crashes
 // when bundling/running on web or mismatched native deps.
@@ -46,5 +47,9 @@ const existingProxy = (global as any).__turboModuleProxy;
   };
 
 export default function Layout() {
-  return <Slot />;
+  return (
+    <ThemeProvider>
+      <Slot />
+    </ThemeProvider>
+  );
 }
