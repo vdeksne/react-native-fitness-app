@@ -241,6 +241,50 @@ export default function Exercises() {
     }
   }, [apiKey, baseUrl, fetchLocalExercises, hostHeader, query, source]);
 
+  const fetchAllLocalExercises = useCallback(async () => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setError(
+        "Missing Supabase config. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("exercises")
+        .select(
+          "id,name,description,image_url,video_url,major_muscle_groups,training_days,is_active"
+        )
+        .or("is_active.is.null,is_active.eq.true")
+        .order("name", { ascending: true })
+        .limit(200);
+
+      if (error) throw error;
+      const arr: any[] = Array.isArray(data) ? data : [];
+      const mapped: ExerciseItem[] = arr.map((ex) => ({
+        id: ex.id,
+        name: ex.name,
+        description: ex.description || "No description provided.",
+        image: ex.image_url || undefined,
+        majorMuscleGroups: ex.major_muscle_groups || [],
+        trainingDays: ex.training_days || [],
+        video: ex.video_url || undefined,
+      }));
+      setItems(mapped);
+    } catch (err: any) {
+      console.warn("[supabase] fetchAllLocalExercises failed", err);
+      setError(err?.message || "Failed to load exercises");
+    } finally {
+      setLoading(false);
+    }
+  }, [supabaseAnonKey, supabaseUrl]);
+
+  const handleViewAllLocal = useCallback(() => {
+    setSource("local");
+    fetchAllLocalExercises();
+  }, [fetchAllLocalExercises]);
+
   const deleteExercise = async (item: ExerciseItem) => {
     if (!item.id) {
       Alert.alert("Cannot delete", "This exercise has no id.");
@@ -300,11 +344,25 @@ export default function Exercises() {
         }
         activeOpacity={0.8}
       >
-        <ExerciseCard item={item} />
+        <ExerciseCard
+          item={item}
+          themeColors={{
+            card: colors.card,
+            border: colors.border,
+            text: colors.text,
+            muted: colors.muted,
+          }}
+        />
       </TouchableOpacity>
-      <View style={styles.cardActions}>
+      <View style={styles.cardActionsRow}>
         <TouchableOpacity
-          style={styles.editPill}
+          style={[
+            styles.editPill,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.accent,
+            },
+          ]}
           onPress={() =>
             router.push({
               pathname: "exercise-detail",
@@ -325,14 +383,24 @@ export default function Exercises() {
           }
           disabled={!item.id}
         >
-          <Text style={styles.editPillText}>Edit</Text>
+          <Text style={[styles.editPillText, { color: colors.text }]}>
+            Edit
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.deletePill}
+          style={[
+            styles.deletePill,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.accent,
+            },
+          ]}
           onPress={() => deleteExercise(item)}
           disabled={!item.id}
         >
-          <Text style={styles.deletePillText}>Delete</Text>
+          <Text style={[styles.deletePillText, { color: colors.text }]}>
+            Delete
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -530,6 +598,26 @@ export default function Exercises() {
         </Text>
       </View>
 
+      <TouchableOpacity
+        style={[
+          styles.addButtonGhost,
+          {
+            backgroundColor: colors.accentDark,
+            borderColor: colors.accentDark,
+            alignSelf: "flex-start",
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            borderRadius: 8,
+            marginBottom: 10,
+          },
+        ]}
+        onPress={handleViewAllLocal}
+      >
+        <Text style={{ color: colors.text, fontWeight: "600", fontSize: 13 }}>
+          View all saved exercises
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.toggleRow}>
         <Text
           style={[
@@ -540,8 +628,8 @@ export default function Exercises() {
               backgroundColor: colors.card,
             },
             source === "api" && {
-              backgroundColor: colors.accent,
-              color: buttonTextColor,
+              backgroundColor: colors.accentDark,
+              color: colors.text,
               borderColor: colors.accentDark,
             },
           ]}
@@ -558,8 +646,8 @@ export default function Exercises() {
               backgroundColor: colors.card,
             },
             source === "local" && {
-              backgroundColor: colors.accent,
-              color: buttonTextColor,
+              backgroundColor: colors.accentDark,
+              color: colors.text,
               borderColor: colors.accentDark,
             },
           ]}
@@ -580,7 +668,11 @@ export default function Exercises() {
             <Text
               style={[
                 styles.addButton,
-                { color: buttonTextColor, backgroundColor: colors.bg },
+                {
+                  color: colors.text,
+                  backgroundColor: colors.accentDark,
+                  borderColor: colors.accentDark,
+                },
               ]}
             >
               + Add new exercise
@@ -728,8 +820,15 @@ export default function Exercises() {
               />
             ) : null}
 
-            <View style={styles.pickerBox}>
-              <Text style={styles.pickerLabel}>Major muscle groups</Text>
+            <View
+              style={[
+                styles.pickerBox,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.pickerLabel, { color: colors.text }]}>
+                Major muscle groups
+              </Text>
               {muscleOptions.map((opt) => {
                 const sel = newMuscles.includes(opt.value);
                 return (
@@ -744,18 +843,28 @@ export default function Exercises() {
                       style={[
                         styles.pickerCheck,
                         sel && styles.pickerCheckActive,
+                        { color: sel ? colors.text : colors.muted },
                       ]}
                     >
                       {sel ? "☑" : "☐"}
                     </Text>
-                    <Text style={styles.pickerText}>{opt.label}</Text>
+                    <Text style={[styles.pickerText, { color: colors.text }]}>
+                      {opt.label}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <View style={styles.pickerBox}>
-              <Text style={styles.pickerLabel}>Training days</Text>
+            <View
+              style={[
+                styles.pickerBox,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.pickerLabel, { color: colors.text }]}>
+                Training days
+              </Text>
               {dayOptions.map((opt) => {
                 const sel = newDays.includes(opt.value);
                 return (
@@ -770,20 +879,30 @@ export default function Exercises() {
                       style={[
                         styles.pickerCheck,
                         sel && styles.pickerCheckActive,
+                        { color: sel ? colors.text : colors.muted },
                       ]}
                     >
                       {sel ? "☑" : "☐"}
                     </Text>
-                    <Text style={styles.pickerText}>{opt.label}</Text>
+                    <Text style={[styles.pickerText, { color: colors.text }]}>
+                      {opt.label}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               placeholder="Video URL (optional)"
-              placeholderTextColor="#111"
+              placeholderTextColor={colors.muted}
               value={newVideoUrl}
               onChangeText={setNewVideoUrl}
             />
@@ -791,33 +910,49 @@ export default function Exercises() {
             <View
               style={[styles.toggleRow, { justifyContent: "space-between" }]}
             >
-              <Text style={styles.addLabel}>Is Active</Text>
+              <Text style={[styles.addLabel, { color: colors.text }]}>
+                Is Active
+              </Text>
               <TouchableOpacity onPress={() => setNewIsActive((v) => !v)}>
-                <Text style={styles.addButtonGhost}>
+                <Text
+                  style={[
+                    styles.addButtonGhost,
+                    { backgroundColor: colors.card, color: colors.text },
+                  ]}
+                >
                   {newIsActive ? "Yes" : "No"}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.addHint}>
+            <Text style={[styles.addHint, { color: colors.muted }]}>
               Saves to your Sanity DB (requires write token).
             </Text>
             <View style={styles.addActions}>
               <TouchableOpacity
                 style={[
                   styles.addButtonPrimary,
+                  {
+                    backgroundColor: colors.accentDark,
+                    borderColor: colors.accent,
+                  },
                   (!supabaseUrl || !supabaseAnonKey || saving) && {
                     opacity: 0.5,
                   },
                 ]}
                 onPress={saving ? undefined : addExercise}
               >
-                <Text style={styles.addButtonPrimaryText}>
+                <Text
+                  style={[styles.addButtonPrimaryText, { color: colors.text }]}
+                >
                   {saving ? "Saving..." : "Save exercise"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.addButtonGhostBox}
+                style={[
+                  styles.addButtonGhostBox,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
                 onPress={() => {
                   setShowAddForm(false);
                   setNewName("");
@@ -829,7 +964,11 @@ export default function Exercises() {
                   setNewIsActive(true);
                 }}
               >
-                <Text style={styles.addButtonGhostText}>Cancel</Text>
+                <Text
+                  style={[styles.addButtonGhostText, { color: colors.text }]}
+                >
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -875,26 +1014,32 @@ export default function Exercises() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#F5F5F5" },
   cardRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
     gap: 8,
     paddingHorizontal: 4,
+    marginBottom: 12,
   },
-  cardActions: {
-    flexDirection: "column",
-    gap: 6,
+  cardActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    paddingLeft: 4,
+    marginTop: 2,
+    marginBottom: 6,
   },
   editPill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#222",
+    borderWidth: 1,
+    borderColor: "#222",
     borderRadius: 10,
   },
   editPillText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   deletePill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#222",
+    borderWidth: 1,
+    borderColor: "#222",
     borderRadius: 10,
   },
   deletePillText: { color: "#fff", fontWeight: "700", fontSize: 12 },

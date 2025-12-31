@@ -233,21 +233,29 @@ export default function History() {
           </Text>
         ) : (
           workouts.map((w) => (
-            <View key={w._id} style={{ marginBottom: 16 }}>
-              <Text style={[styles.workoutDate, { color: colors.text }]}>
-                {w.date ? new Date(w.date).toLocaleString() : "Unknown date"}
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.deletePill,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                onPress={() => deleteWorkout(w._id)}
-              >
-                <Text style={[styles.deletePillText, { color: colors.text }]}>
-                  Delete
+            <View
+              key={w._id}
+              style={[
+                styles.workoutBlock,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.workoutHeaderRow}>
+                <Text style={[styles.workoutDate, { color: colors.text }]}>
+                  {w.date ? new Date(w.date).toLocaleString() : "Unknown date"}
                 </Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.deletePill,
+                    { backgroundColor: colors.card, borderColor: colors.accent },
+                  ]}
+                  onPress={() => deleteWorkout(w._id)}
+                >
+                  <Text style={[styles.deletePillText, { color: colors.text }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {w.exercises.map((ex, idx) => (
                 <ExerciseCard
                   key={`${w._id}-${idx}`}
@@ -320,41 +328,41 @@ function ExerciseCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#0B0C0F",
   },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    backgroundColor: "#0B0C0F",
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "#162029",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   link: {
-    color: "#111",
+    color: "#EAFDFC",
     fontSize: 14,
     fontWeight: "700",
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   summaryCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#162029",
     marginBottom: 12,
     shadowColor: "transparent",
   },
   summaryTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
     marginBottom: 10,
   },
   summaryHeaderRow: {
@@ -371,7 +379,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 13,
-    color: "#444",
+    color: "#B7C6D4",
   },
   loaderRow: {
     flexDirection: "row",
@@ -380,11 +388,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   loaderText: {
-    color: "#111",
+    color: "#EAFDFC",
     fontSize: 13,
   },
   errorText: {
-    color: "#222",
+    color: "#08E8DE",
     fontSize: 13,
   },
   clearBtn: {
@@ -392,11 +400,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#F5F5F5",
+    borderColor: "#162029",
+    backgroundColor: "#0F1116",
   },
   clearBtnText: {
-    color: "#C83737",
+    color: "#08E8DE",
     fontWeight: "800",
     fontSize: 12,
   },
@@ -415,21 +423,21 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: "center",
-    color: "#444",
+    color: "#B7C6D4",
     marginTop: 12,
   },
   workoutDate: {
     fontSize: 13,
-    color: "#444",
+    color: "#B7C6D4",
     marginBottom: 8,
     marginLeft: 4,
   },
   exerciseCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#162029",
     marginBottom: 12,
     shadowColor: "transparent",
   },
@@ -442,35 +450,35 @@ const styles = StyleSheet.create({
   exerciseTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   exerciseMeta: {
     marginTop: 2,
     fontSize: 12,
-    color: "#555",
+    color: "#B7C6D4",
   },
   badge: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#121820",
     alignItems: "center",
     justifyContent: "center",
   },
   badgeText: {
-    color: "#111",
+    color: "#EAFDFC",
     fontWeight: "700",
     fontSize: 12,
   },
   sectionLabel: {
     fontSize: 12,
-    color: "#555",
+    color: "#B7C6D4",
     marginBottom: 6,
   },
   setRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f6f6f6",
+    backgroundColor: "#111821",
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -480,8 +488,8 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#e6e6e6",
-    color: "#111",
+    backgroundColor: "#162029",
+    color: "#EAFDFC",
     fontWeight: "700",
     fontSize: 12,
     textAlign: "center",
@@ -490,22 +498,22 @@ const styles = StyleSheet.create({
   },
   setLabel: {
     fontSize: 13,
-    color: "#222",
+    color: "#EAFDFC",
   },
   setWeight: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   volumeLabel: {
     marginTop: 8,
     fontSize: 12,
-    color: "#555",
+    color: "#B7C6D4",
   },
   volumeValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   deletePill: {
     alignSelf: "flex-end",
@@ -513,12 +521,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#F5F5F5",
+    borderColor: "#162029",
+    backgroundColor: "#0F1116",
     marginBottom: 8,
   },
   deletePillText: {
-    color: "#C83737",
+    color: "#EAFDFC",
     fontWeight: "800",
     fontSize: 12,
   },

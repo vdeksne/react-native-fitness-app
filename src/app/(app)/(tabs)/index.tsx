@@ -415,20 +415,28 @@ export default function Page() {
             <View style={styles.weekGrid}>
               {weekDays.map((day) => (
                 <View key={day.key} style={styles.weekCell}>
-                  <Text style={styles.weekLabel}>{day.label}</Text>
+                  <Text style={[styles.weekLabel, { color: colors.muted }]}>
+                    {day.label}
+                  </Text>
                   <View
                     style={[
                       styles.calendarDot,
-                      day.hasWorkout && styles.calendarDotActive,
-                      day.isToday && styles.calendarDotToday,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                      day.hasWorkout && {
+                        backgroundColor: colors.accentDark,
+                        borderColor: colors.accent,
+                      },
+                      day.isToday && {
+                        borderColor: colors.accent,
+                        borderWidth: 1.5,
+                      },
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.calendarDayText,
-                        (day.hasWorkout || day.isToday) &&
-                          styles.calendarDayTextActive,
-                      ]}
+                      style={[styles.calendarDayText, { color: colors.text }]}
                     >
                       {day.label.split(" ")[1]}
                     </Text>
@@ -457,24 +465,23 @@ export default function Page() {
                       <View
                         style={[
                           styles.calendarDot,
-                          day.hasWorkout && styles.calendarDotActive,
-                          day.isToday && styles.calendarDotToday,
                           {
-                            backgroundColor: colors.bg,
+                            backgroundColor: colors.card,
                             borderColor: colors.border,
                           },
                           day.hasWorkout && {
-                            backgroundColor: colors.accent,
-                            borderColor: colors.accentDark,
+                            backgroundColor: colors.accentDark,
+                            borderColor: colors.accent,
                           },
-                          day.isToday && { borderColor: colors.accent },
+                          day.isToday && {
+                            borderColor: colors.accent,
+                            borderWidth: 1.5,
+                          },
                         ]}
                       >
                         <Text
                           style={[
                             styles.calendarDayText,
-                            (day.hasWorkout || day.isToday) &&
-                              styles.calendarDayTextActive,
                             { color: colors.text },
                           ]}
                         >

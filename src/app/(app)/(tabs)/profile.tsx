@@ -1039,7 +1039,7 @@ export default function Profile() {
         {/* Stats summary */}
         <View style={styles.metricsRow}>
           <View style={styles.metric}>
-            <Ionicons name="flash-outline" size={22} color="#111" />
+            <Ionicons name="flash-outline" size={22} color={colors.accent} />
             <Text style={styles.metricValue}>
               {loading ? "…" : stats.totalWorkouts}
             </Text>
@@ -1048,14 +1048,14 @@ export default function Profile() {
             </Text>
           </View>
           <View style={styles.metric}>
-            <Ionicons name="person-outline" size={22} color="#111" />
+            <Ionicons name="person-outline" size={22} color={colors.accent} />
             <Text style={styles.metricValue}>
               {loading ? "…" : formattedTime}
             </Text>
             <Text style={styles.metricLabel}>Total Time</Text>
           </View>
           <View style={styles.metric}>
-            <Ionicons name="fitness-outline" size={22} color="#111" />
+            <Ionicons name="fitness-outline" size={22} color={colors.accent} />
             <Text style={styles.metricValue}>
               {loading ? "…" : `${stats.totalVolume} kg`}
             </Text>
@@ -1451,12 +1451,12 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
     marginTop: 6,
   },
   metricLabel: {
     fontSize: 12,
-    color: "#888",
+    color: "#B7C6D4",
     marginTop: 2,
   },
   tabs: {
@@ -1596,13 +1596,15 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     marginTop: 8,
-    backgroundColor: "#111",
+    backgroundColor: "#0F1116",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#08E8DE",
   },
   primaryActionText: {
-    color: "#fff",
+    color: "#EAFDFC",
     fontWeight: "700",
     fontSize: 14,
   },
@@ -1682,18 +1684,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   sectionSub: {
     marginTop: 4,
-    color: "#666",
+    color: "#B7C6D4",
     fontSize: 12,
   },
   measureCard: {
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#0F1116",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#162029",
     padding: 16,
     gap: 12,
     marginBottom: 12,
@@ -1706,24 +1708,24 @@ const styles = StyleSheet.create({
   },
   measureLabel: {
     fontSize: 14,
-    color: "#111",
+    color: "#EAFDFC",
     flex: 1,
   },
   measureInput: {
     borderWidth: 1,
-    borderColor: "#DADADA",
+    borderColor: "#162029",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     width: 120,
-    backgroundColor: "#fff",
-    color: "#111",
+    backgroundColor: "#0B0C0F",
+    color: "#EAFDFC",
   },
   historyCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E2E2E2",
+    borderColor: "#162029",
     padding: 12,
     marginBottom: 10,
   },
@@ -1736,12 +1738,12 @@ const styles = StyleSheet.create({
   historyLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   historyWeight: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#111",
+    color: "#EAFDFC",
   },
   historyActions: {
     flexDirection: "row",
@@ -1752,17 +1754,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: "#0B0C0F",
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   historyActionText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   historyDeleteText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#C83737",
+    color: "#08E8DE",
   },
   historyGrid: {
     flexDirection: "row",
@@ -1771,11 +1775,13 @@ const styles = StyleSheet.create({
   },
   historyMetric: {
     fontSize: 12,
-    color: "#444",
-    backgroundColor: "#F4F4F4",
+    color: "#EAFDFC",
+    backgroundColor: "#0B0C0F",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   editBanner: {
     backgroundColor: "#111",
@@ -1860,11 +1866,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#F5F5F5",
+    borderColor: "#162029",
+    backgroundColor: "#0F1116",
   },
   clearBtnText: {
-    color: "#C83737",
+    color: "#08E8DE",
     fontWeight: "800",
     fontSize: 12,
   },

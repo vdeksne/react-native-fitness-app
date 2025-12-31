@@ -859,13 +859,13 @@ export default function Workout() {
               style={[
                 styles.planActionBtn,
                 {
-                  backgroundColor: colors.accent,
-                  borderColor: colors.accentDark,
+                  backgroundColor: colors.accentDark,
+                  borderColor: colors.accent,
                 },
               ]}
               onPress={() => openPlanModal()}
             >
-              <Text style={[styles.planActionText, { color: buttonTextColor }]}>
+              <Text style={[styles.planActionText, { color: colors.text }]}>
                 + Add day
               </Text>
             </TouchableOpacity>
@@ -1024,21 +1024,33 @@ export default function Workout() {
 
           <View style={styles.dayPicker}>
             <TouchableOpacity
-              style={styles.dayPickerTrigger}
+              style={[
+                styles.dayPickerTrigger,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={() => setShowDayList((v) => !v)}
             >
-              <Text style={styles.dayPickerLabel}>Quick start</Text>
+              <Text style={[styles.dayPickerLabel, { color: colors.muted }]}>
+                Quick start
+              </Text>
               <View style={styles.dayPickerValueRow}>
-                <Text style={styles.dayPickerValue}>{selectedDayLabel}</Text>
+                <Text style={[styles.dayPickerValue, { color: colors.text }]}>
+                  {selectedDayLabel}
+                </Text>
                 <Ionicons
                   name={showDayList ? "chevron-up" : "chevron-down"}
                   size={16}
-                  color="#111"
+                  color={colors.text}
                 />
               </View>
             </TouchableOpacity>
             {showDayList && (
-              <View style={styles.dayList}>
+              <View
+                style={[
+                  styles.dayList,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
                 {dayOptions.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
@@ -1052,6 +1064,7 @@ export default function Workout() {
                       style={[
                         styles.dayListText,
                         opt.value === selectedDay && styles.dayListTextActive,
+                        { color: colors.text },
                       ]}
                     >
                       {opt.label}
@@ -1066,13 +1079,13 @@ export default function Workout() {
             style={[
               styles.successBtn,
               {
-                backgroundColor: colors.accent,
-                borderColor: colors.accentDark,
+                backgroundColor: colors.accentDark,
+                borderColor: colors.accent,
               },
             ]}
             onPress={handleStart}
           >
-            <Text style={[styles.successBtnText, { color: buttonTextColor }]}>
+            <Text style={[styles.successBtnText, { color: colors.text }]}>
               Start workout
             </Text>
           </TouchableOpacity>
