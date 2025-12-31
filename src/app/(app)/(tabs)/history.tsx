@@ -58,18 +58,41 @@ export default function History() {
     load();
   }, []);
 
-  const deleteWorkout = async (id: string) => {
+  const deleteWorkout = async (id?: string, idx?: number) => {
+    if (!id && idx === undefined) {
+      Alert.alert("Delete failed", "Missing workout id.");
+      return;
+    }
     Alert.alert("Delete workout", "Remove this workout from history?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          setWorkouts((prev) => prev.filter((w) => w._id !== id));
+          setSaving(true);
+          const prev = workouts;
+          setWorkouts((cur) =>
+            idx !== undefined
+              ? cur.filter((_, i) => i !== idx)
+              : cur.filter((w) => w._id !== id)
+          );
           try {
-            await supabase.from("workouts").delete().eq("id", id);
-          } catch {
-            // ignore for now
+            if (id) {
+              await supabase.from("workouts").delete().eq("id", id);
+            } else if (idx !== undefined && prev[idx]?._id) {
+              await supabase
+                .from("workouts")
+                .delete()
+                .eq("id", prev[idx]._id);
+            }
+          } catch (e: any) {
+            setWorkouts(prev);
+            Alert.alert(
+              "Delete failed",
+              e?.message || "Could not delete workout."
+            );
+          } finally {
+            setSaving(false);
           }
         },
       },
@@ -83,13 +106,21 @@ export default function History() {
       {
         text: "Clear",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
           setSaving(true);
-          supabase
-            .from("workouts")
-            .delete()
-            .then(() => setWorkouts([]))
-            .finally(() => setSaving(false));
+          const prev = workouts;
+          try {
+            setWorkouts([]);
+            await supabase.from("workouts").delete();
+          } catch (e: any) {
+            setWorkouts(prev);
+            Alert.alert(
+              "Clear failed",
+              e?.message || "Could not clear workout history."
+            );
+          } finally {
+            setSaving(false);
+          }
         },
       },
     ]);
@@ -232,7 +263,7 @@ export default function History() {
             No workouts saved yet.
           </Text>
         ) : (
-          workouts.map((w) => (
+          workouts.map((w, idx) => (
             <View
               key={w._id}
               style={[
@@ -249,7 +280,7 @@ export default function History() {
                     styles.deletePill,
                     { backgroundColor: colors.card, borderColor: colors.accent },
                   ]}
-                  onPress={() => deleteWorkout(w._id)}
+                  onPress={() => deleteWorkout(w._id, idx)}
                 >
                   <Text style={[styles.deletePillText, { color: colors.text }]}>
                     Delete

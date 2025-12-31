@@ -377,6 +377,38 @@ export default function Exercises() {
                 ),
                 days: (item.trainingDays || item.bodyParts || []).join(","),
                 type: item.type || item.muscle || "",
+                edit: "0",
+              },
+            })
+          }
+          disabled={!item.id}
+        >
+          <Text style={[styles.editPillText, { color: colors.text }]}>
+            View
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.editPill,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.accent,
+            },
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "exercise-detail",
+              params: {
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                image: item.image || "",
+                video: item.video || "",
+                muscles: (item.majorMuscleGroups || item.targets || []).join(
+                  ","
+                ),
+                days: (item.trainingDays || item.bodyParts || []).join(","),
+                type: item.type || item.muscle || "",
                 edit: "1",
               },
             })

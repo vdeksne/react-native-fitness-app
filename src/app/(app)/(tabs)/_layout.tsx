@@ -32,14 +32,20 @@ export default function Layout() {
         headerShown: true,
         headerTitle: () => <Logo color={colors.accent} />,
         headerTitleAlign: "center",
+        headerShadowVisible: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
           backgroundColor: colors.tabBg,
           borderTopColor: colors.border,
+          borderTopWidth: 0,
         },
         headerStyle: {
           backgroundColor: colors.headerBg,
+          borderBottomWidth: 0,
+          borderBottomColor: "transparent",
+          elevation: 0,
+          shadowOpacity: 0,
         },
         headerTitleStyle: {
           color: colors.text,

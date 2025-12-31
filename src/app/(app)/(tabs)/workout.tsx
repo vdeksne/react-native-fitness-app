@@ -1159,13 +1159,20 @@ export default function Workout() {
           <View
             style={[
               styles.activePlanCard,
-              { backgroundColor: activePlan.color || "#F6F6F6" },
+              {
+                backgroundColor: colors.card,
+                borderColor: activePlan.color || colors.accent,
+              },
             ]}
           >
             <View style={styles.activePlanHeader}>
               <View>
-                <Text style={styles.activePlanDay}>{activePlan.dayLabel}</Text>
-                <Text style={styles.activePlanFocus}>{activePlan.focus}</Text>
+                <Text style={[styles.activePlanDay, { color: colors.text }]}>
+                  {activePlan.dayLabel}
+                </Text>
+                <Text style={[styles.activePlanFocus, { color: colors.text }]}>
+                  {activePlan.focus}
+                </Text>
               </View>
               <View style={styles.planRightChips}>
                 {completedPlans.includes(activePlan.value) ? (
@@ -1173,13 +1180,27 @@ export default function Workout() {
                     <Ionicons
                       name="checkmark-circle"
                       size={14}
-                      color="#0F5132"
+                      color={colors.accent}
                     />
-                    <Text style={styles.planDoneText}>Done</Text>
+                    <Text style={[styles.planDoneText, { color: colors.text }]}>
+                      Done
+                    </Text>
                   </View>
                 ) : null}
-                <View style={styles.activePlanChip}>
-                  <Text style={styles.activePlanChipText}>Plan</Text>
+                <View
+                  style={[
+                    styles.activePlanChip,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.accent,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.activePlanChipText, { color: colors.text }]}
+                  >
+                    Plan
+                  </Text>
                 </View>
               </View>
             </View>
@@ -1194,8 +1215,14 @@ export default function Workout() {
                   key={`${activePlan.id}-live-${idx}`}
                   style={styles.planLine}
                 >
-                  <View style={styles.planDot} />
-                  <Text style={styles.planExerciseText}>{line}</Text>
+                  <View
+                    style={[styles.planDot, { backgroundColor: colors.accent }]}
+                  />
+                  <Text
+                    style={[styles.planExerciseText, { color: colors.text }]}
+                  >
+                    {line}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -1204,21 +1231,33 @@ export default function Workout() {
 
         <View style={styles.dayPicker}>
           <TouchableOpacity
-            style={styles.dayPickerTrigger}
+            style={[
+              styles.dayPickerTrigger,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={() => setShowDayList((v) => !v)}
           >
-            <Text style={styles.dayPickerLabel}>Training Day</Text>
+            <Text style={[styles.dayPickerLabel, { color: colors.muted }]}>
+              Training Day
+            </Text>
             <View style={styles.dayPickerValueRow}>
-              <Text style={styles.dayPickerValue}>{selectedDayLabel}</Text>
+              <Text style={[styles.dayPickerValue, { color: colors.text }]}>
+                {selectedDayLabel}
+              </Text>
               <Ionicons
                 name={showDayList ? "chevron-up" : "chevron-down"}
                 size={16}
-                color="#111"
+                color={colors.text}
               />
             </View>
           </TouchableOpacity>
           {showDayList && (
-            <View style={styles.dayList}>
+            <View
+              style={[
+                styles.dayList,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               {dayOptions.map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -1232,6 +1271,7 @@ export default function Workout() {
                     style={[
                       styles.dayListText,
                       opt.value === selectedDay && styles.dayListTextActive,
+                      { color: colors.text },
                     ]}
                   >
                     {opt.label}
@@ -1242,7 +1282,7 @@ export default function Workout() {
           )}
         </View>
 
-        <Text style={styles.caption}>
+        <Text style={[styles.caption, { color: colors.muted }]}>
           {sessionExercises.length}{" "}
           {sessionExercises.length === 1 ? "exercise" : "exercises"}
         </Text>
@@ -1258,7 +1298,7 @@ export default function Workout() {
                 style={[
                   styles.cardHeader,
                   ex.completed && {
-                    backgroundColor: "#F4F4F4",
+                    backgroundColor: colors.card,
                     borderRadius: 8,
                   },
                 ]}
@@ -1283,14 +1323,14 @@ export default function Workout() {
                   <Ionicons
                     name={ex.expanded ? "chevron-up" : "chevron-down"}
                     size={18}
-                    color="#111"
+                    color={colors.text}
                   />
                   {ex.expanded ? (
                     <TouchableOpacity
                       style={styles.iconBtn}
                       onPress={() => removeExercise(ex.key)}
                     >
-                      <Ionicons name="trash" size={18} color="#444" />
+                      <Ionicons name="trash" size={18} color={colors.text} />
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -1434,10 +1474,15 @@ export default function Workout() {
         )}
 
         <TouchableOpacity
-          style={styles.primaryBtn}
+          style={[
+            styles.primaryBtn,
+            { backgroundColor: colors.accentDark, borderColor: colors.accent },
+          ]}
           onPress={() => setShowExerciseList(true)}
         >
-          <Text style={styles.primaryBtnText}>+ Add Exercise</Text>
+          <Text style={[styles.primaryBtnText, { color: colors.text }]}>
+            + Add Exercise
+          </Text>
         </TouchableOpacity>
 
         {lastRemovedExercise ? (
@@ -1455,11 +1500,18 @@ export default function Workout() {
         ) : null}
 
         <TouchableOpacity
-          style={[styles.successBtn, saving && { opacity: 0.7 }]}
+          style={[
+            styles.successBtn,
+            {
+              backgroundColor: colors.accentDark,
+              borderColor: colors.accent,
+            },
+            saving && { opacity: 0.7 },
+          ]}
           onPress={handleComplete}
           disabled={saving}
         >
-          <Text style={styles.successBtnText}>
+          <Text style={[styles.successBtnText, { color: colors.text }]}>
             {saving ? "Saving..." : "Complete Workout"}
           </Text>
         </TouchableOpacity>
@@ -1477,9 +1529,9 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderBottomWidth: 1,
-    borderBottomColor: "#ECECEC",
+    borderBottomColor: "#162029",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1487,12 +1539,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   headerSub: {
     marginTop: 2,
     fontSize: 12,
-    color: "#777",
+    color: "#B7C6D4",
   },
   headerRight: {
     flexDirection: "row",
@@ -1510,39 +1562,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   unitBtnActive: {
-    backgroundColor: "#111",
+    backgroundColor: "#08E8DE",
   },
   unitText: {
-    color: "#E0E0E0",
+    color: "#EAFDFC",
     fontSize: 12,
     fontWeight: "600",
   },
   unitTextActive: {
-    color: "#fff",
+    color: "#0B0C0F",
   },
   endBtn: {
-    backgroundColor: "#333",
+    backgroundColor: "#222",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#08E8DE",
   },
   endBtnText: {
-    color: "#fff",
+    color: "#EAFDFC",
     fontSize: 12,
     fontWeight: "700",
   },
   caption: {
     textAlign: "center",
-    color: "#777",
+    color: "#B7C6D4",
     fontSize: 12,
     marginBottom: 12,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#162029",
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 3 },
@@ -1559,68 +1613,70 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   cardMeta: {
     marginTop: 2,
     fontSize: 11,
-    color: "#777",
+    color: "#B7C6D4",
   },
   iconBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#E6E6E6",
+    backgroundColor: "#0F1116",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
     marginBottom: 10,
   },
   emptySet: {
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#D0D0D0",
+    borderColor: "#162029",
     borderRadius: 10,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 10,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#0F1116",
   },
   emptySetText: {
-    color: "#666",
+    color: "#B7C6D4",
     fontSize: 13,
   },
   addSetBtn: {
     borderWidth: 1,
-    borderColor: "#444",
+    borderColor: "#162029",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#F2F2F2",
+    backgroundColor: "#0F1116",
   },
   addSetText: {
-    color: "#222",
+    color: "#EAFDFC",
     fontSize: 14,
     fontWeight: "700",
   },
   setRow: {
     borderWidth: 1,
-    borderColor: "#DADADA",
+    borderColor: "#162029",
     borderRadius: 12,
     padding: 10,
     paddingRight: 12,
     marginBottom: 10,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: "#0F1116",
     overflow: "hidden",
   },
   setIndex: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#333",
+    color: "#EAFDFC",
     marginBottom: 6,
   },
   setInputs: {
@@ -1633,37 +1689,42 @@ const styles = StyleSheet.create({
   },
   setLabel: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "#B7C6D4",
     marginBottom: 4,
   },
   setInput: {
     borderWidth: 1,
-    borderColor: "#D6D6D6",
+    borderColor: "#162029",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
+    color: "#EAFDFC",
   },
   finishExerciseBtn: {
     marginTop: 10,
-    backgroundColor: "#333",
+    backgroundColor: "#222",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#222",
   },
   finishExerciseText: {
-    color: "#fff",
+    color: "#EAFDFC",
     fontWeight: "700",
     fontSize: 14,
   },
   finishedPill: {
-    backgroundColor: "#E6E6E6",
-    color: "#333",
+    backgroundColor: "#0F1116",
+    color: "#EAFDFC",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 9,
     fontWeight: "700",
     fontSize: 11,
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   setActions: {
     flexDirection: "row",
@@ -1685,9 +1746,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#E6E6E6",
+    backgroundColor: "#0F1116",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   dayPicker: {
     marginBottom: 16,
@@ -1740,6 +1803,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#222",
   },
   primaryBtnText: {
     color: "#fff",
@@ -1751,6 +1816,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#444",
   },
   successBtnText: {
     color: "#fff",
@@ -1758,10 +1825,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   exerciseList: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E8E8E8",
+    borderColor: "#162029",
     padding: 12,
     marginBottom: 16,
   },
@@ -1774,21 +1841,21 @@ const styles = StyleSheet.create({
   exerciseListTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   exerciseListItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E6E6E6",
+    borderBottomColor: "#162029",
   },
   exerciseListName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
   },
   exerciseListMeta: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "#B7C6D4",
     marginTop: 2,
   },
   loaderRow: {
@@ -1798,11 +1865,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   loaderText: {
-    color: "#111",
+    color: "#EAFDFC",
     fontSize: 13,
   },
   errorText: {
-    color: "#555",
+    color: "#08E8DE",
     fontSize: 13,
   },
   starter: {
@@ -1820,13 +1887,13 @@ const styles = StyleSheet.create({
   starterTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#111",
+    color: "#EAFDFC",
     marginBottom: 8,
     textAlign: "center",
   },
   starterSubtitle: {
     fontSize: 14,
-    color: "#666",
+    color: "#B7C6D4",
     marginBottom: 20,
     textAlign: "center",
   },

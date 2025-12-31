@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,14 +10,17 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabaseSafe as supabase } from "../../../lib/supabase";
 // @ts-ignore expo-image-picker resolved at runtime
 import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
+import { useTheme } from "../../../context/ThemeContext";
 
 export default function ExerciseDetail() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{
     id?: string;
     name?: string;
@@ -99,6 +102,8 @@ export default function ExerciseDetail() {
           .filter(Boolean)
       : []
   );
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
   const chips = (value?: string) =>
     value
       ?.split(",")
@@ -176,6 +181,44 @@ export default function ExerciseDetail() {
     [supabaseBucket]
   );
 
+  // Fetch latest exercise from Supabase when an id is provided
+  useEffect(() => {
+    const load = async () => {
+      if (!params.id) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("exercises")
+          .select(
+            "id,name,description,image_url,video_url,major_muscle_groups,training_days"
+          )
+          .eq("id", params.id)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          setName(data.name || "");
+          setDescription(data.description || "");
+          setImage(data.image_url || "");
+          setVideo(data.video_url || "");
+          const mg = Array.isArray(data.major_muscle_groups)
+            ? data.major_muscle_groups
+            : [];
+          const td = Array.isArray(data.training_days) ? data.training_days : [];
+          setSelectedMuscles(mg);
+          setSelectedDays(td);
+          setMuscles(mg.join(","));
+          setDays(td.join(","));
+        }
+      } catch (e) {
+        console.warn("[exercise-detail] load failed", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+    // only on id change
+  }, [params.id]);
+
   const handleSave = async () => {
     if (!params.id) {
       Alert.alert("Missing id", "Cannot update exercise without an id.");
@@ -187,20 +230,48 @@ export default function ExerciseDetail() {
     }
     setSaving(true);
     try {
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || "No description provided.",
+        image_url: image.trim() || null,
+        video_url: video.trim() || null,
+        major_muscle_groups: selectedMuscles,
+        training_days: selectedDays,
+      };
+
       const { error } = await supabase
         .from("exercises")
-        .update({
-          name: name.trim(),
-          description: description.trim() || "No description provided.",
-          image_url: image.trim() || null,
-          video_url: video.trim() || null,
-          major_muscle_groups: selectedMuscles,
-          training_days: selectedDays,
-        })
+        .update(payload)
         .eq("id", params.id);
       if (error) throw error;
       Alert.alert("Saved", "Exercise updated.");
       setEditing(false);
+      // Re-fetch latest from Supabase to ensure the image/fields are in sync
+      if (params.id) {
+        const { data } = await supabase
+          .from("exercises")
+          .select(
+            "id,name,description,image_url,video_url,major_muscle_groups,training_days"
+          )
+          .eq("id", params.id)
+          .maybeSingle();
+        if (data) {
+          setName(data.name || "");
+          setDescription(data.description || "");
+          setImage(data.image_url || "");
+          setVideo(data.video_url || "");
+          const mg = Array.isArray(data.major_muscle_groups)
+            ? data.major_muscle_groups
+            : [];
+          const td = Array.isArray(data.training_days)
+            ? data.training_days
+            : [];
+          setSelectedMuscles(mg);
+          setSelectedDays(td);
+          setMuscles(mg.join(","));
+          setDays(td.join(","));
+        }
+      }
     } catch (e: any) {
       Alert.alert("Update failed", e?.message || "Could not update exercise.");
     } finally {
@@ -210,51 +281,84 @@ export default function ExerciseDetail() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={{ paddingBottom: 32 }}
     >
       <View style={styles.topRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>← Back</Text>
+          <Text style={[styles.back, { color: colors.text }]}>← Back</Text>
         </TouchableOpacity>
         {params.id ? (
           <TouchableOpacity
-            style={styles.editBtn}
+            style={[
+              styles.editBtn,
+              { backgroundColor: colors.accentDark, borderColor: colors.accent },
+            ]}
             onPress={() => setEditing((v) => !v)}
           >
-            <Text style={styles.editBtnText}>
+            <Text style={[styles.editBtnText, { color: colors.text }]}>
               {editing ? "Cancel" : "Edit"}
             </Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.metaMuted}>Read-only</Text>
+          <Text style={[styles.metaMuted, { color: colors.muted }]}>
+            Read-only
+          </Text>
         )}
       </View>
 
       {editing ? (
         <>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             value={name}
             onChangeText={setName}
             placeholder="Name"
+            placeholderTextColor={colors.muted}
           />
           <TextInput
-            style={[styles.input, styles.inputArea]}
+            style={[
+              styles.input,
+              styles.inputArea,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             value={description}
             onChangeText={setDescription}
             placeholder="Description"
+            placeholderTextColor={colors.muted}
             multiline
           />
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             value={image}
             onChangeText={setImage}
             placeholder="Image URL"
+            placeholderTextColor={colors.muted}
             autoCapitalize="none"
           />
           <TouchableOpacity
-            style={styles.pickButton}
+            style={[
+              styles.pickButton,
+              { backgroundColor: colors.card, borderColor: colors.accent },
+            ]}
             onPress={async () => {
               const perm =
                 await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -281,10 +385,15 @@ export default function ExerciseDetail() {
               }
             }}
           >
-            <Text style={styles.pickButtonText}>Pick image from device</Text>
+            <Text style={[styles.pickButtonText, { color: colors.text }]}>
+              Pick image from device
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.pickButton}
+            style={[
+              styles.pickButton,
+              { backgroundColor: colors.card, borderColor: colors.accent },
+            ]}
             onPress={async () => {
               const perm = await ImagePicker.requestCameraPermissionsAsync();
               if (perm.status !== "granted") {
@@ -309,17 +418,29 @@ export default function ExerciseDetail() {
               }
             }}
           >
-            <Text style={styles.pickButtonText}>Take photo</Text>
+            <Text style={[styles.pickButtonText, { color: colors.text }]}>
+              Take photo
+            </Text>
           </TouchableOpacity>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
             value={video}
             onChangeText={setVideo}
             placeholder="Video URL"
+            placeholderTextColor={colors.muted}
             autoCapitalize="none"
           />
           <View style={styles.selectorBox}>
-            <Text style={styles.sectionTitle}>Major muscle groups</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Major muscle groups
+            </Text>
             <View style={styles.chipRow}>
               {muscleOptions.map((opt) => {
                 const sel = selectedMuscles.includes(opt.value);
@@ -329,6 +450,10 @@ export default function ExerciseDetail() {
                     style={[
                       styles.selectorPill,
                       sel && styles.selectorPillActive,
+                      {
+                        backgroundColor: sel ? colors.accent : colors.card,
+                        borderColor: sel ? colors.accent : colors.border,
+                      },
                     ]}
                     onPress={() => {
                       const next = toggleValue(selectedMuscles, opt.value);
@@ -340,6 +465,7 @@ export default function ExerciseDetail() {
                       style={[
                         styles.selectorPillText,
                         sel && styles.selectorPillTextActive,
+                          { color: sel ? "#0B0C0F" : colors.text },
                       ]}
                     >
                       {opt.label}
@@ -351,7 +477,9 @@ export default function ExerciseDetail() {
           </View>
 
           <View style={styles.selectorBox}>
-            <Text style={styles.sectionTitle}>Training days</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Training days
+            </Text>
             <View style={styles.chipRow}>
               {dayOptions.map((opt) => {
                 const sel = selectedDays.includes(opt.value);
@@ -361,6 +489,10 @@ export default function ExerciseDetail() {
                     style={[
                       styles.selectorPill,
                       sel && styles.selectorPillActive,
+                      {
+                        backgroundColor: sel ? colors.accent : colors.card,
+                        borderColor: sel ? colors.accent : colors.border,
+                      },
                     ]}
                     onPress={() => {
                       const next = toggleValue(selectedDays, opt.value);
@@ -372,6 +504,7 @@ export default function ExerciseDetail() {
                       style={[
                         styles.selectorPillText,
                         sel && styles.selectorPillTextActive,
+                          { color: sel ? "#0B0C0F" : colors.text },
                       ]}
                     >
                       {opt.label}
@@ -382,50 +515,98 @@ export default function ExerciseDetail() {
             </View>
           </View>
           <TouchableOpacity
-            style={styles.saveBtn}
+            style={[
+              styles.saveBtn,
+              { backgroundColor: colors.accentDark, borderColor: colors.accent },
+            ]}
             onPress={handleSave}
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.text} />
             ) : (
-              <Text style={styles.saveBtnText}>Save</Text>
+              <Text style={[styles.saveBtnText, { color: colors.text }]}>
+                Save
+              </Text>
             )}
           </TouchableOpacity>
         </>
       ) : (
         <>
-          <Text style={styles.title}>{name || "Exercise"}</Text>
-          {params.type ? <Text style={styles.meta}>{params.type}</Text> : null}
+          <Text style={[styles.title, { color: colors.text }]}>
+            {name || "Exercise"}
+          </Text>
+          {params.type ? (
+            <Text style={[styles.meta, { color: colors.muted }]}>{params.type}</Text>
+          ) : null}
 
           {image ? (
-            <Image
-              source={{ uri: image }}
-              style={styles.hero}
-              resizeMode="cover"
-            />
+            <>
+              <TouchableOpacity onPress={() => setZoomVisible(true)} activeOpacity={0.9}>
+                <Image
+                  source={{ uri: image }}
+                  style={styles.hero}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+              <Modal visible={zoomVisible} transparent animationType="fade">
+                <View style={styles.zoomBackdrop}>
+                  <TouchableOpacity
+                    style={styles.zoomClose}
+                    onPress={() => setZoomVisible(false)}
+                  >
+                    <Text style={styles.zoomCloseText}>Close</Text>
+                  </TouchableOpacity>
+                  <Image
+                    source={{ uri: image }}
+                    style={styles.zoomImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              </Modal>
+            </>
           ) : (
-            <View style={[styles.hero, styles.heroPlaceholder]}>
-              <Text style={styles.placeholderText}>No image</Text>
+            <View
+              style={[
+                styles.hero,
+                styles.heroPlaceholder,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.placeholderText, { color: colors.muted }]}>
+                No image
+              </Text>
             </View>
           )}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.body}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Description
+            </Text>
+            <Text style={[styles.body, { color: colors.text }]}>
               {description || "No description provided."}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Major muscle groups</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Major muscle groups
+            </Text>
             <View style={styles.chipRow}>
               {chips(muscles).length === 0 ? (
-                <Text style={styles.metaMuted}>Not specified</Text>
+                <Text style={[styles.metaMuted, { color: colors.muted }]}>
+                  Not specified
+                </Text>
               ) : (
                 chips(muscles).map((m) => (
-                  <View key={m} style={styles.chip}>
-                    <Text style={styles.chipText}>{m}</Text>
+                  <View
+                    key={m}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: colors.card, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: colors.text }]}>{m}</Text>
                   </View>
                 ))
               )}
@@ -433,14 +614,24 @@ export default function ExerciseDetail() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Training days</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Training days
+            </Text>
             <View style={styles.chipRow}>
               {chips(days).length === 0 ? (
-                <Text style={styles.metaMuted}>Not specified</Text>
+                <Text style={[styles.metaMuted, { color: colors.muted }]}>
+                  Not specified
+                </Text>
               ) : (
                 chips(days).map((d) => (
-                  <View key={d} style={styles.chip}>
-                    <Text style={styles.chipText}>{d}</Text>
+                  <View
+                    key={d}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: colors.card, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: colors.text }]}>{d}</Text>
                   </View>
                 ))
               )}
@@ -448,13 +639,23 @@ export default function ExerciseDetail() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Media</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Media</Text>
             {video ? (
-              <TouchableOpacity style={styles.button} onPress={openVideo}>
-                <Text style={styles.buttonText}>Open video</Text>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { backgroundColor: colors.accentDark, borderColor: colors.accent },
+                ]}
+                onPress={openVideo}
+              >
+                <Text style={[styles.buttonText, { color: colors.text }]}>
+                  Open video
+                </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={styles.metaMuted}>No video provided</Text>
+              <Text style={[styles.metaMuted, { color: colors.muted }]}>
+                No video provided
+              </Text>
             )}
           </View>
         </>
@@ -464,67 +665,77 @@ export default function ExerciseDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5", padding: 16 },
+  container: { flex: 1, backgroundColor: "#0B0C0F", padding: 16 },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  back: { color: "#111", marginBottom: 8, fontWeight: "700" },
+  back: { color: "#EAFDFC", marginBottom: 8, fontWeight: "700" },
   editBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: "#222",
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#222",
   },
-  editBtnText: { color: "#fff", fontWeight: "700" },
-  title: { fontSize: 22, fontWeight: "800", color: "#111", marginBottom: 4 },
-  meta: { fontSize: 14, color: "#333", marginBottom: 4, fontWeight: "700" },
-  metaMuted: { fontSize: 13, color: "#666" },
+  editBtnText: { color: "#EAFDFC", fontWeight: "700" },
+  title: { fontSize: 22, fontWeight: "800", color: "#EAFDFC", marginBottom: 4 },
+  meta: { fontSize: 14, color: "#B7C6D4", marginBottom: 4, fontWeight: "700" },
+  metaMuted: { fontSize: 13, color: "#B7C6D4" },
   hero: {
     width: "100%",
     height: 200,
     borderRadius: 12,
-    backgroundColor: "#E6E6E6",
+    backgroundColor: "#0F1116",
+    borderWidth: 1,
+    borderColor: "#162029",
     marginVertical: 12,
   },
   heroPlaceholder: {
     alignItems: "center",
     justifyContent: "center",
   },
-  placeholderText: { color: "#666", fontWeight: "700" },
+  placeholderText: { color: "#B7C6D4", fontWeight: "700" },
   section: { marginTop: 12 },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111",
+    color: "#EAFDFC",
     marginBottom: 6,
   },
-  body: { fontSize: 14, color: "#222", lineHeight: 20 },
+  body: { fontSize: 14, color: "#EAFDFC", lineHeight: 20 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#EAEAEA",
+    backgroundColor: "#0F1116",
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#162029",
   },
-  chipText: { fontSize: 13, color: "#111", fontWeight: "700" },
+  chipText: { fontSize: 13, color: "#EAFDFC", fontWeight: "700" },
   button: {
     marginTop: 8,
     backgroundColor: "#222",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#222",
   },
-  buttonText: { color: "#fff", fontWeight: "700" },
+  buttonText: { color: "#EAFDFC", fontWeight: "700" },
   pickButton: {
     marginTop: 8,
-    backgroundColor: "#444",
+    backgroundColor: "#0F1116",
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#162029",
   },
-  pickButtonText: { color: "#fff", fontWeight: "700" },
+  pickButtonText: { color: "#EAFDFC", fontWeight: "700" },
   input: {
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -539,10 +750,10 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   selectorBox: {
-    backgroundColor: "#fff",
+    backgroundColor: "#0F1116",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#162029",
     padding: 10,
     marginBottom: 10,
   },
@@ -550,18 +761,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: "#E8E8E8",
+    backgroundColor: "#0F1116",
+    borderWidth: 1,
+    borderColor: "#162029",
   },
   selectorPillActive: {
-    backgroundColor: "#222",
+    backgroundColor: "#08E8DE",
   },
   selectorPillText: {
     fontSize: 12,
-    color: "#333",
+    color: "#EAFDFC",
     fontWeight: "600",
   },
   selectorPillTextActive: {
-    color: "#fff",
+    color: "#0B0C0F",
   },
   saveBtn: {
     backgroundColor: "#222",
@@ -569,6 +782,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#222",
   },
-  saveBtnText: { color: "#fff", fontWeight: "700" },
+  saveBtnText: { color: "#EAFDFC", fontWeight: "700" },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  zoomImage: {
+    width: "100%",
+    height: "80%",
+    borderRadius: 12,
+  },
+  zoomClose: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    backgroundColor: "#08E8DE",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  zoomCloseText: { color: "#0B0C0F", fontWeight: "800" },
 });
